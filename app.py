@@ -164,32 +164,37 @@ def index():
 @app.route('/register', methods=['POST'])
 def register():
     u = request.form['username']
-    p = hash_password(request.form['password'])
+    p = request.form['password']
+
+    hashed_password = generate_password_hash(p)
 
     conn = sqlite3.connect('app.db')
     c = conn.cursor()
-    try:
-        hashed_password = generate_password_hash(password)
 
-c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
+    try:
+        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (u, hashed_password))
+        conn.commit()
     except:
         pass
+
     conn.close()
     return redirect('/')
-
 @app.route('/login', methods=['POST'])
 def login():
+ def login():
     u = request.form['username']
-    p = hash_password(request.form['password'])
+    p = request.form['password']
 
     conn = sqlite3.connect('app.db')
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username=? AND password=?", (u, p))
+
+    c.execute("SELECT * FROM users WHERE username=?", (u,))
     user = c.fetchone()
+
     conn.close()
 
-    if user:
-        if user and check_password_hash(user[2], password):
+    if user and check_password_hash(user[2], p):
+        session['user_id'] = user[0]
 
     return redirect('/')
 
