@@ -1,3 +1,4 @@
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, request, redirect, render_template_string, session
 import sqlite3
 import hashlib
@@ -168,8 +169,9 @@ def register():
     conn = sqlite3.connect('app.db')
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (u, p))
-        conn.commit()
+        hashed_password = generate_password_hash(password)
+
+c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
     except:
         pass
     conn.close()
@@ -187,7 +189,7 @@ def login():
     conn.close()
 
     if user:
-        session['user_id'] = user[0]
+        if user and check_password_hash(user[2], password):
 
     return redirect('/')
 
