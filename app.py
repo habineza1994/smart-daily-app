@@ -139,7 +139,7 @@ def hash_password(pw):
 @app.route('/')
 def index():
     if not session.get('user_id'):
-        return render_template_string(TEMPLATE)
+        return render_template_string(TEMPLATE, income=0, expense=0, balance=0, notes=[], tasks=[])
 
     conn = sqlite3.connect('app.db')
     c = conn.cursor()
@@ -160,7 +160,6 @@ def index():
     balance = income - expense
 
     return render_template_string(TEMPLATE, income=income, expense=expense, balance=balance, notes=notes, tasks=tasks)
-
 @app.route('/register', methods=['POST'])
 def register():
     u = request.form['username']
