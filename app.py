@@ -1,166 +1,68 @@
-from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, request, redirect, render_template_string, session
 import sqlite3
-import hashlib
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = 'super_secret_key'
+app.secret_key = "secret123"
 
-# ---------- DATABASE ----------
-conn = sqlite3.connect('app.db')
-c = conn.cursor()
-
-c.execute('''CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT
-)''')
-
-c.execute('''CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    type TEXT,
-    amount REAL,
-    description TEXT
-)''')
-
-c.execute('''CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    content TEXT
-)''')
-
-c.execute('''CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    task TEXT,
-    status TEXT
-)''')
-
-conn.commit()
-conn.close()
-
-# ---------- HTML ----------
-TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body { font-family: Arial; padding: 10px; background:#f5f5f5; }
-.card { background:white; padding:10px; margin:10px 0; border-radius:10px; }
-input, select { width:100%; padding:8px; margin:5px 0; }
-button { width:100%; padding:10px; background:green; color:white; border:none; }
-</style>
-</head>
-<body>
-
-<h2>🔥 Smart Daily App</h2>
-
-{% if not session.get('user_id') %}
-
-<div class="card">
-<h3>Login</h3>
-<form method="POST" action="/login">
-<input name="username" required>
-<input type="password" name="password" required>
-<button>Login</button>
-</form>
-</div>
-
-<div class="card">
-<h3>Register</h3>
-<form method="POST" action="/register">
-<input name="username" required>
-<input type="password" name="password" required>
-<button>Register</button>
-</form>
-</div>
-
-{% else %}
-
-<div class="card"><a href="/logout">Logout</a></div>
-
-<div class="card">
-<h3>💰 Finance</h3>
-<form method="POST" action="/add">
-<select name="type">
-<option value="income">Income</option>
-<option value="expense">Expense</option>
-</select>
-<input name="amount" type="number" required>
-<input name="description">
-<button>Add</button>
-</form>
-
-<p>Income: {{income}}</p>
-<p>Expense: {{expense}}</p>
-<p><b>Balance: {{balance}}</b></p>
-</div>
-
-<div class="card">
-<h3>📝 Notes</h3>
-<form method="POST" action="/add_note">
-<input name="content" placeholder="Write note" required>
-<button>Add Note</button>
-</form>
-
-<ul>
-{% for n in notes %}
-<li>{{n[2]}}</li>
-{% endfor %}
-</ul>
-</div>
-
-<div class="card">
-<h3>📅 Tasks</h3>
-<form method="POST" action="/add_task">
-<input name="task" placeholder="New task" required>
-<button>Add Task</button>
-</form>
-
-<ul>
-{% for t in tasks %}
-<li>{{t[2]}} - {{t[3]}}</li>
-{% endfor %}
-</ul>
-</div>
-
-{% endif %}
-
-</body>
-</html>
-"""
-
-# ---------- FUNCTIONS ----------
-def hash_password(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
-
-# ---------- ROUTES ----------
-@app.route('/')
-def index():
-    if not session.get('user_id'):
-        return render_template_string(TEMPLATE, income=0, expense=0, balance=0, notes=[], tasks=[])
-
+# ================= DATABASE =================
+def init_db():
     conn = sqlite3.connect('app.db')
     c = conn.cursor()
 
-    c.execute("SELECT * FROM transactions WHERE user_id=?", (session['user_id'],))
-    data = c.fetchall()
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT
+    )
+    ''')
 
-    c.execute("SELECT * FROM notes WHERE user_id=?", (session['user_id'],))
-    notes = c.fetchall()
-
-    c.execute("SELECT * FROM tasks WHERE user_id=?", (session['user_id'],))
-    tasks = c.fetchall()
-
+    conn.commit()
     conn.close()
 
-    income = sum([x[3] for x in data if x[2]=='income'])
-    expense = sum([x[3] for x in data if x[2]=='expense'])
-    balance = income - expense
+init_db()
 
-    return render_template_string(TEMPLATE, income=income, expense=expense, balance=balance, notes=notes, tasks=tasks)
+# ================= HOME =================
+@app.route('/')
+def home():
+    if 'user_id' not in session:
+        return redirect('/login_page')
+
+    return render_template_string('''
+    <h2>Smart Daily App</h2>
+    <a href="/logout">Logout</a>
+
+    <h3>Welcome 🎉</h3>
+    ''')
+
+# ================= REGISTER PAGE =================
+@app.route('/register_page')
+def register_page():
+    return render_template_string('''
+    <h2>Register</h2>
+    <form method="post" action="/register">
+        <input name="username" placeholder="Username" required><br><br>
+        <input name="password" type="password" placeholder="Password" required><br><br>
+        <button type="submit">Register</button>
+    </form>
+    <a href="/login_page">Go to Login</a>
+    ''')
+
+# ================= LOGIN PAGE =================
+@app.route('/login_page')
+def login_page():
+    return render_template_string('''
+    <h2>Login</h2>
+    <form method="post" action="/login">
+        <input name="username" placeholder="Username" required><br><br>
+        <input name="password" type="password" placeholder="Password" required><br><br>
+        <button type="submit">Login</button>
+    </form>
+    <a href="/register_page">Create account</a>
+    ''')
+
+# ================= REGISTER =================
 @app.route('/register', methods=['POST'])
 def register():
     u = request.form['username']
@@ -178,10 +80,11 @@ def register():
         pass
 
     conn.close()
-    return redirect('/')
+    return redirect('/login_page')
+
+# ================= LOGIN =================
 @app.route('/login', methods=['POST'])
 def login():
- def login():
     u = request.form['username']
     p = request.form['password']
 
@@ -195,66 +98,16 @@ def login():
 
     if user and check_password_hash(user[2], p):
         session['user_id'] = user[0]
+        return redirect('/')
 
-    return redirect('/')
+    return "Login Failed ❌"
 
+# ================= LOGOUT =================
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect('/')
+    return redirect('/login_page')
 
-@app.route('/add', methods=['POST'])
-def add():
-    if not session.get('user_id'):
-        return redirect('/')
-
-    t = request.form['type']
-    a = float(request.form['amount'])
-    d = request.form['description']
-
-    conn = sqlite3.connect('app.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO transactions (user_id, type, amount, description) VALUES (?,?,?,?)",
-              (session['user_id'], t, a, d))
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-@app.route('/add_note', methods=['POST'])
-def add_note():
-    if not session.get('user_id'):
-        return redirect('/')
-
-    content = request.form['content']
-
-    conn = sqlite3.connect('app.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO notes (user_id, content) VALUES (?,?)", (session['user_id'], content))
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-@app.route('/add_task', methods=['POST'])
-def add_task():
-    if not session.get('user_id'):
-        return redirect('/')
-
-    task = request.form['task']
-
-    conn = sqlite3.connect('app.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO tasks (user_id, task, status) VALUES (?,?,?)",
-              (session['user_id'], task, 'pending'))
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
+# ================= RUN =================
 if __name__ == '__main__':
-    import os
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
