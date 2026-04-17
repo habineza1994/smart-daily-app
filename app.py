@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, render_template, session, url_for
+from flask import Flask, request, redirect, render_template, session
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
@@ -45,24 +45,23 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ================= AUTH CHECK =================
-def login_required():
-    if 'user_id' not in session:
-        return False
-    return True
-    @app.before_request
+# ✅ FIX: run DB safely
+@app.before_request
 def setup():
     init_db()
 
+# ================= AUTH CHECK =================
+def login_required():
+    return 'user_id' in session
+
 # ================= HOME =================
-    @app.route('/')
+@app.route('/')
 def home():
     if not login_required():
         return redirect('/login_page')
 
     conn = get_db()
     c = conn.cursor()
-
     user_id = session['user_id']
 
     c.execute("SELECT SUM(amount) FROM finance WHERE user_id=? AND type='income'", (user_id,))
@@ -74,10 +73,10 @@ def home():
     balance = income - expense
 
     c.execute("SELECT * FROM notes WHERE user_id=?", (user_id,))
-notes = [dict(row) for row in c.fetchall()]
+    notes = [dict(row) for row in c.fetchall()]
 
-c.execute("SELECT * FROM tasks WHERE user_id=?", (user_id,))
-tasks = [dict(row) for row in c.fetchall()])
+    c.execute("SELECT * FROM tasks WHERE user_id=?", (user_id,))
+    tasks = [dict(row) for row in c.fetchall()]
 
     conn.close()
 
@@ -109,7 +108,7 @@ def register():
     try:
         c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed))
         conn.commit()
-    except Exception as e:
+    except:
         return "User already exists"
 
     conn.close()
