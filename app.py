@@ -45,10 +45,8 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ✅ FIX: run DB safely
-@app.before_request
-def setup():
-    init_db()
+# Run DB ONCE at start
+init_db()
 
 # ================= AUTH CHECK =================
 def login_required():
@@ -80,12 +78,14 @@ def home():
 
     conn.close()
 
-    return render_template('dashboard.html',
-                           income=income,
-                           expense=expense,
-                           balance=balance,
-                           notes=notes,
-                           tasks=tasks)
+    return render_template(
+        'dashboard.html',
+        income=income,
+        expense=expense,
+        balance=balance,
+        notes=notes,
+        tasks=tasks
+    )
 
 # ================= REGISTER =================
 @app.route('/register_page')
@@ -94,8 +94,8 @@ def register_page():
 
 @app.route('/register', methods=['POST'])
 def register():
-    username = request.form['username']
-    password = request.form['password']
+    username = request.form.get('username')
+    password = request.form.get('password')
 
     if not username or not password:
         return "Fill all fields"
@@ -108,7 +108,8 @@ def register():
     try:
         c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed))
         conn.commit()
-    except:
+    except sqlite3.IntegrityError:
+        conn.close()
         return "User already exists"
 
     conn.close()
@@ -121,8 +122,8 @@ def login_page():
 
 @app.route('/login', methods=['POST'])
 def login():
-    username = request.form['username']
-    password = request.form['password']
+    username = request.form.get('username')
+    password = request.form.get('password')
 
     conn = get_db()
     c = conn.cursor()
@@ -153,12 +154,14 @@ def add():
     except:
         return "Invalid amount"
 
-    ftype = request.form['type']
+    ftype = request.form.get('type')
 
     conn = get_db()
     c = conn.cursor()
-    c.execute("INSERT INTO finance (user_id, type, amount) VALUES (?, ?, ?)",
-              (session['user_id'], ftype, amount))
+    c.execute(
+        "INSERT INTO finance (user_id, type, amount) VALUES (?, ?, ?)",
+        (session['user_id'], ftype, amount)
+    )
     conn.commit()
     conn.close()
 
@@ -170,14 +173,16 @@ def add_note():
     if not login_required():
         return redirect('/login_page')
 
-    content = request.form['content']
+    content = request.form.get('content')
     if not content:
         return redirect('/')
 
     conn = get_db()
     c = conn.cursor()
-    c.execute("INSERT INTO notes (user_id, content) VALUES (?, ?)",
-              (session['user_id'], content))
+    c.execute(
+        "INSERT INTO notes (user_id, content) VALUES (?, ?)",
+        (session['user_id'], content)
+    )
     conn.commit()
     conn.close()
 
@@ -190,7 +195,10 @@ def delete_note(id):
 
     conn = get_db()
     c = conn.cursor()
-    c.execute("DELETE FROM notes WHERE id=? AND user_id=?", (id, session['user_id']))
+    c.execute(
+        "DELETE FROM notes WHERE id=? AND user_id=?",
+        (id, session['user_id'])
+    )
     conn.commit()
     conn.close()
 
@@ -202,14 +210,16 @@ def add_task():
     if not login_required():
         return redirect('/login_page')
 
-    task = request.form['task']
+    task = request.form.get('task')
     if not task:
         return redirect('/')
 
     conn = get_db()
     c = conn.cursor()
-    c.execute("INSERT INTO tasks (user_id, task) VALUES (?, ?)",
-              (session['user_id'], task))
+    c.execute(
+        "INSERT INTO tasks (user_id, task) VALUES (?, ?)",
+        (session['user_id'], task)
+    )
     conn.commit()
     conn.close()
 
@@ -222,8 +232,10 @@ def toggle_task(id):
 
     conn = get_db()
     c = conn.cursor()
-    c.execute("UPDATE tasks SET done = CASE WHEN done=1 THEN 0 ELSE 1 END WHERE id=? AND user_id=?",
-              (id, session['user_id']))
+    c.execute(
+        "UPDATE tasks SET done = CASE WHEN done=1 THEN 0 ELSE 1 END WHERE id=? AND user_id=?",
+        (id, session['user_id'])
+    )
     conn.commit()
     conn.close()
 
@@ -236,7 +248,10 @@ def delete_task(id):
 
     conn = get_db()
     c = conn.cursor()
-    c.execute("DELETE FROM tasks WHERE id=? AND user_id=?", (id, session['user_id']))
+    c.execute(
+        "DELETE FROM tasks WHERE id=? AND user_id=?",
+        (id, session['user_id'])
+    )
     conn.commit()
     conn.close()
 
