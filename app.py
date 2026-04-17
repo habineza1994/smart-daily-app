@@ -73,10 +73,10 @@ def home():
     balance = income - expense
 
     c.execute("SELECT * FROM notes WHERE user_id=?", (user_id,))
-    notes = c.fetchall()
+notes = [dict(row) for row in c.fetchall()]
 
-    c.execute("SELECT * FROM tasks WHERE user_id=?", (user_id,))
-    tasks = c.fetchall()
+c.execute("SELECT * FROM tasks WHERE user_id=?", (user_id,))
+tasks = [dict(row) for row in c.fetchall()])
 
     conn.close()
 
