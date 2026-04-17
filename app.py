@@ -1,17 +1,19 @@
-from flask import Flask, request, redirect, render_template_string, session
+from flask import Flask, request, redirect, render_template, session, url_for
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
 app = Flask(__name__)
-app.secret_key = "very_long_random_secret_key_!@#2026_secure"
+app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret_key")
 
 # ================= DATABASE =================
-def safe_connect():
-    return sqlite3.connect('app.db', check_same_thread=False)
+def get_db():
+    conn = sqlite3.connect('app.db')
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def init_db():
-    conn = safe_connect()
+    conn = get_db()
     c = conn.cursor()
 
     c.execute('''CREATE TABLE IF NOT EXISTS users (
@@ -43,214 +45,203 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Initialize the database
 init_db()
+
+# ================= AUTH CHECK =================
+def login_required():
+    if 'user_id' not in session:
+        return False
+    return True
 
 # ================= HOME =================
 @app.route('/')
 def home():
-    if 'user_id' not in session:
+    if not login_required():
         return redirect('/login_page')
 
-    conn = safe_connect()
+    conn = get_db()
     c = conn.cursor()
 
-    c.execute("SELECT SUM(amount) FROM finance WHERE user_id=? AND type='income'", (session['user_id'],))
+    user_id = session['user_id']
+
+    c.execute("SELECT SUM(amount) FROM finance WHERE user_id=? AND type='income'", (user_id,))
     income = c.fetchone()[0] or 0
 
-    c.execute("SELECT SUM(amount) FROM finance WHERE user_id=? AND type='expense'", (session['user_id'],))
+    c.execute("SELECT SUM(amount) FROM finance WHERE user_id=? AND type='expense'", (user_id,))
     expense = c.fetchone()[0] or 0
 
     balance = income - expense
 
-    c.execute("SELECT id, content FROM notes WHERE user_id=?", (session['user_id'],))
+    c.execute("SELECT * FROM notes WHERE user_id=?", (user_id,))
     notes = c.fetchall()
 
-    c.execute("SELECT id, task, done FROM tasks WHERE user_id=?", (session['user_id'],))
+    c.execute("SELECT * FROM tasks WHERE user_id=?", (user_id,))
     tasks = c.fetchall()
 
     conn.close()
 
-    return render_template_string('''
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    return render_template('dashboard.html',
+                           income=income,
+                           expense=expense,
+                           balance=balance,
+                           notes=notes,
+                           tasks=tasks)
 
-    <style>
-    body { font-family: Arial; background: #f4f6f9; padding: 20px; }
-    .card { background: white; padding: 15px; margin-bottom: 15px;
-            border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
-    button { background: #4CAF50; color: white; border: none; padding: 6px 10px; border-radius: 5px;}
-    input, select { padding: 6px; margin: 5px; border-radius: 5px; border: 1px solid #ccc;}
-    .done { text-decoration: line-through; color: gray; }
-    </style>
-
-    <h2>📱 Smart Daily App</h2>
-    <a href="/logout">Logout</a>
-
-    <div class="card">
-    <h3>💰 Finance</h3>
-    <form method="post" action="/add">
-        <input name="amount" placeholder="Amount" required>
-        <select name="type">
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
-        </select>
-        <button>Add</button>
-    </form>
-
-    <p>Income: {{income}}</p>
-    <p>Expense: {{expense}}</p>
-    <p><b>Balance: {{balance}}</b></p>
-
-    <canvas id="chart"></canvas>
-    </div>
-
-    <div class="card">
-    <h3>📝 Notes</h3>
-    <form method="post" action="/add_note">
-        <input name="content">
-        <button>Add</button>
-    </form>
-
-    <ul>
-    {% for note in notes %}
-        <li>{{note[1]}} <a href="/delete_note/{{note[0]}}">❌</a></li>
-    {% endfor %}
-    </ul>
-    </div>
-
-    <div class="card">
-    <h3>📅 Tasks</h3>
-    <form method="post" action="/add_task">
-        <input name="task">
-        <button>Add</button>
-    </form>
-
-    <ul>
-    {% for task in tasks %}
-        <li class="{{'done' if task[2]==1 else ''}}">
-            {{task[1]}}
-            <a href="/toggle_task/{{task[0]}}">✅</a>
-            <a href="/delete_task/{{task[0]}}">❌</a>
-        </li>
-    {% endfor %}
-    </ul>
-    </div>
-
-    <script>
-    // CHART
-    new Chart(document.getElementById("chart"), {
-        type: 'pie',
-        data: {
-            labels: ['Income', 'Expense'],
-            datasets: [{
-                data: [{{income}}, {{expense}}],
-                backgroundColor: ['green', 'red']
-            }]
-        }
-    });
-
-    // NOTIFICATION
-    if (Notification.permission !== "granted") {
-        Notification.requestPermission();
-    }
-
-    function notify() {
-        new Notification("Smart Daily App", {
-            body: "Wibuke gukora tasks zawe!"
-        });
-    }
-
-    setTimeout(notify, 5000);
-    </script>
-    ''', income=income, expense=expense, balance=balance, notes=notes, tasks=tasks)
-
-# ================= TASK TOGGLE =================
-@app.route('/toggle_task/<int:id>')
-def toggle_task(id):
-    if 'user_id' not in session:
-        return redirect('/login_page')
-
-    conn = safe_connect()
-    c = conn.cursor()
-    c.execute("UPDATE tasks SET done = CASE WHEN done=1 THEN 0 ELSE 1 END WHERE id=?", (id,))
-    conn.commit()
-    conn.close()
-    return redirect('/')
-
-# ================= AUTH =================
+# ================= REGISTER =================
 @app.route('/register_page')
 def register_page():
-    return render_template_string('''
-    <h2>Register</h2>
-    <form method="post" action="/register">
-        <input name="username" required><br><br>
-        <input name="password" type="password" required><br><br>
-        <button>Register</button>
-    </form>
-    <a href="/login_page">Login</a>
-    ''')
-
-@app.route('/login_page')
-def login_page():
-    return render_template_string('''
-    <h2>Login</h2>
-    <form method="post" action="/login">
-        <input name="username" required><br><br>
-        <input name="password" type="password" required><br><br>
-        <button>Login</button>
-    </form>
-    <a href="/register_page">Register</a>
-    ''')
+    return render_template('register.html')
 
 @app.route('/register', methods=['POST'])
 def register():
-    u = request.form['username']
-    p = generate_password_hash(request.form['password'])
+    username = request.form['username']
+    password = request.form['password']
 
-    conn = safe_connect()
+    if not username or not password:
+        return "Fill all fields"
+
+    hashed = generate_password_hash(password)
+
+    conn = get_db()
     c = conn.cursor()
+
     try:
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (u, p))
+        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed))
         conn.commit()
-    except:
-        pass
+    except Exception as e:
+        return "User already exists"
+
     conn.close()
     return redirect('/login_page')
 
+# ================= LOGIN =================
+@app.route('/login_page')
+def login_page():
+    return render_template('login.html')
+
 @app.route('/login', methods=['POST'])
 def login():
-    u = request.form['username']
-    p = request.form['password']
+    username = request.form['username']
+    password = request.form['password']
 
-    conn = safe_connect()
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username=?", (u,))
+    c.execute("SELECT * FROM users WHERE username=?", (username,))
     user = c.fetchone()
     conn.close()
 
-    if user and check_password_hash(user[2], p):
-        session['user_id'] = user[0]
+    if user and check_password_hash(user['password'], password):
+        session['user_id'] = user['id']
         return redirect('/')
 
-    return "Login Failed"
+    return "Login failed"
 
-# ================= ACTIONS =================
+# ================= LOGOUT =================
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login_page')
+
+# ================= FINANCE =================
 @app.route('/add', methods=['POST'])
 def add():
-    if 'user_id' not in session:
+    if not login_required():
         return redirect('/login_page')
 
-    conn = safe_connect()
+    try:
+        amount = int(request.form['amount'])
+    except:
+        return "Invalid amount"
+
+    ftype = request.form['type']
+
+    conn = get_db()
     c = conn.cursor()
     c.execute("INSERT INTO finance (user_id, type, amount) VALUES (?, ?, ?)",
-              (session['user_id'], request.form['type'], int(request.form['amount'])))
+              (session['user_id'], ftype, amount))
     conn.commit()
     conn.close()
+
     return redirect('/')
 
+# ================= NOTES =================
 @app.route('/add_note', methods=['POST'])
 def add_note():
-    if 'user_id' not in session:
+    if not login_required():
         return redirect('/login_page')
 
-    conn = safe_connect()
+    content = request.form['content']
+    if not content:
+        return redirect('/')
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("INSERT INTO notes (user_id, content) VALUES (?, ?)",
+              (session['user_id'], content))
+    conn.commit()
+    conn.close()
+
+    return redirect('/')
+
+@app.route('/delete_note/<int:id>', methods=['POST'])
+def delete_note(id):
+    if not login_required():
+        return redirect('/login_page')
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM notes WHERE id=? AND user_id=?", (id, session['user_id']))
+    conn.commit()
+    conn.close()
+
+    return redirect('/')
+
+# ================= TASKS =================
+@app.route('/add_task', methods=['POST'])
+def add_task():
+    if not login_required():
+        return redirect('/login_page')
+
+    task = request.form['task']
+    if not task:
+        return redirect('/')
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("INSERT INTO tasks (user_id, task) VALUES (?, ?)",
+              (session['user_id'], task))
+    conn.commit()
+    conn.close()
+
+    return redirect('/')
+
+@app.route('/toggle_task/<int:id>', methods=['POST'])
+def toggle_task(id):
+    if not login_required():
+        return redirect('/login_page')
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE tasks SET done = CASE WHEN done=1 THEN 0 ELSE 1 END WHERE id=? AND user_id=?",
+              (id, session['user_id']))
+    conn.commit()
+    conn.close()
+
+    return redirect('/')
+
+@app.route('/delete_task/<int:id>', methods=['POST'])
+def delete_task(id):
+    if not login_required():
+        return redirect('/login_page')
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM tasks WHERE id=? AND user_id=?", (id, session['user_id']))
+    conn.commit()
+    conn.close()
+
+    return redirect('/')
+
+# ================= RUN =================
+if __name__ == "__main__":
+    app.run(debug=True)
