@@ -45,18 +45,16 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()
-
 # ================= AUTH CHECK =================
 def login_required():
     if 'user_id' not in session:
         return False
     return True
-
-# ================= HOME =================
-@app.before_request
+    @app.before_request
 def setup():
     init_db()
+
+# ================= HOME =================
     @app.route('/')
 def home():
     if not login_required():
