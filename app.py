@@ -54,7 +54,10 @@ def login_required():
     return True
 
 # ================= HOME =================
-@app.route('/')
+@app.before_request
+def setup():
+    init_db()
+    @app.route('/')
 def home():
     if not login_required():
         return redirect('/login_page')
