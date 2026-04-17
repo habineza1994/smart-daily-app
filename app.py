@@ -3,7 +3,7 @@ import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = "super_secret_key_123"
 
 # ================= DATABASE =================
 def init_db():
@@ -49,6 +49,9 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+# CALL DATABASE
+init_db()
 
 # ================= HOME =================
 @app.route('/')
@@ -166,7 +169,9 @@ def login():
         return redirect('/')
 
     return "Login Failed ❌"
-    @app.route('/add', methods=['POST'])
+
+# ================= ADD FINANCE =================
+@app.route('/add', methods=['POST'])
 def add():
     if 'user_id' not in session:
         return redirect('/login_page')
@@ -184,7 +189,9 @@ def add():
     conn.close()
 
     return redirect('/')
-    @app.route('/add_note', methods=['POST'])
+
+# ================= ADD NOTE =================
+@app.route('/add_note', methods=['POST'])
 def add_note():
     if 'user_id' not in session:
         return redirect('/login_page')
@@ -201,7 +208,8 @@ def add_note():
     conn.close()
 
     return redirect('/')
-    
+
+# ================= ADD TASK =================
 @app.route('/add_task', methods=['POST'])
 def add_task():
     if 'user_id' not in session:
@@ -219,6 +227,7 @@ def add_task():
     conn.close()
 
     return redirect('/')
+
 # ================= LOGOUT =================
 @app.route('/logout')
 def logout():
