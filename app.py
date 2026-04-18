@@ -1,262 +1,132 @@
-from flask import Flask, request, redirect, render_template, session
+from flask import Flask, render_template, request, redirect, session, url_for
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
-import os
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "fallback_secret_key")
+app.secret_key = "super_secret_key"
 
 # ================= DATABASE =================
 def get_db():
-    conn = sqlite3.connect('app.db')
+    conn = sqlite3.connect("database.db")
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
     conn = get_db()
-    c = conn.cursor()
 
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
-        password TEXT
-    )''')
+        password TEXT,
+        role TEXT DEFAULT 'user',
+        active INTEGER DEFAULT 1
+    )
+    """)
 
-    c.execute('''CREATE TABLE IF NOT EXISTS finance (
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
-        type TEXT,
-        amount INTEGER
-    )''')
-
-    c.execute('''CREATE TABLE IF NOT EXISTS notes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        content TEXT
-    )''')
-
-    c.execute('''CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        task TEXT,
-        done INTEGER DEFAULT 0
-    )''')
+        content TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
     conn.commit()
     conn.close()
 
-# Run DB ONCE at start
 init_db()
 
-# ================= AUTH CHECK =================
-def login_required():
-    return 'user_id' in session
-
-# ================= HOME =================
-@app.route('/')
-def home():
-    if not login_required():
-        return redirect('/login_page')
-
-    conn = get_db()
-    c = conn.cursor()
-    user_id = session['user_id']
-
-    c.execute("SELECT SUM(amount) FROM finance WHERE user_id=? AND type='income'", (user_id,))
-    income = c.fetchone()[0] or 0
-
-    c.execute("SELECT SUM(amount) FROM finance WHERE user_id=? AND type='expense'", (user_id,))
-    expense = c.fetchone()[0] or 0
-
-    balance = income - expense
-
-    c.execute("SELECT * FROM notes WHERE user_id=?", (user_id,))
-    notes = [dict(row) for row in c.fetchall()]
-
-    c.execute("SELECT * FROM tasks WHERE user_id=?", (user_id,))
-    tasks = [dict(row) for row in c.fetchall()]
-
-    conn.close()
-
-    return render_template(
-        'dashboard.html',
-        income=income,
-        expense=expense,
-        balance=balance,
-        notes=notes,
-        tasks=tasks
-    )
-
-# ================= REGISTER =================
-@app.route('/register_page')
-def register_page():
-    return render_template('register.html')
-
-@app.route('/register', methods=['POST'])
-def register():
-    username = request.form.get('username')
-    password = request.form.get('password')
-
-    if not username or not password:
-        return "Fill all fields"
-
-    hashed = generate_password_hash(password)
-
-    conn = get_db()
-    c = conn.cursor()
-
-    try:
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed))
-        conn.commit()
-    except sqlite3.IntegrityError:
-        conn.close()
-        return "User already exists"
-
-    conn.close()
-    return redirect('/login_page')
-
-# ================= LOGIN =================
-@app.route('/login_page')
-def login_page():
-    return render_template('login.html')
-
-@app.route('/login', methods=['POST'])
+# ================= AUTH =================
+@app.route("/", methods=["GET","POST"])
 def login():
-    username = request.form.get('username')
-    password = request.form.get('password')
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        conn = get_db()
+        user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+
+        if user and check_password_hash(user["password"], password) and user["active"] == 1:
+            session["user_id"] = user["id"]
+            session["role"] = user["role"]
+
+            if user["role"] == "admin":
+                return redirect("/admin")
+            return redirect("/dashboard")
+
+        return "Login Failed"
+
+    return render_template("login.html")
+
+
+@app.route("/register", methods=["GET","POST"])
+def register():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = generate_password_hash(request.form["password"])
+
+        conn = get_db()
+        conn.execute("INSERT INTO users (username,password) VALUES (?,?)", (username,password))
+        conn.commit()
+        conn.close()
+
+        return redirect("/")
+
+    return render_template("register.html")
+
+# ================= ADMIN =================
+@app.route("/admin")
+def admin():
+    if session.get("role") != "admin":
+        return redirect("/")
 
     conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username=?", (username,))
-    user = c.fetchone()
-    conn.close()
+    users = conn.execute("SELECT * FROM users").fetchall()
+    records = conn.execute("""
+        SELECT records.*, users.username 
+        FROM records 
+        JOIN users ON records.user_id = users.id
+    """).fetchall()
 
-    if user and check_password_hash(user['password'], password):
-        session['user_id'] = user['id']
-        return redirect('/')
+    return render_template("admin.html", users=users, records=records)
 
-    return "Login failed"
 
-# ================= LOGOUT =================
-@app.route('/logout')
+@app.route("/disable/<int:id>")
+def disable(id):
+    conn = get_db()
+    conn.execute("UPDATE users SET active=0 WHERE id=?", (id,))
+    conn.commit()
+    return redirect("/admin")
+
+
+# ================= USER =================
+@app.route("/dashboard", methods=["GET","POST"])
+def dashboard():
+    if "user_id" not in session:
+        return redirect("/")
+
+    if request.method == "POST":
+        content = request.form["content"]
+
+        conn = get_db()
+        conn.execute("INSERT INTO records (user_id, content) VALUES (?,?)",
+                     (session["user_id"], content))
+        conn.commit()
+
+    conn = get_db()
+    records = conn.execute("SELECT * FROM records WHERE user_id=?",
+                           (session["user_id"],)).fetchall()
+
+    return render_template("user.html", records=records)
+
+
+@app.route("/logout")
 def logout():
     session.clear()
-    return redirect('/login_page')
+    return redirect("/")
 
-# ================= FINANCE =================
-@app.route('/add', methods=['POST'])
-def add():
-    if not login_required():
-        return redirect('/login_page')
 
-    try:
-        amount = int(request.form['amount'])
-    except:
-        return "Invalid amount"
-
-    ftype = request.form.get('type')
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO finance (user_id, type, amount) VALUES (?, ?, ?)",
-        (session['user_id'], ftype, amount)
-    )
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-# ================= NOTES =================
-@app.route('/add_note', methods=['POST'])
-def add_note():
-    if not login_required():
-        return redirect('/login_page')
-
-    content = request.form.get('content')
-    if not content:
-        return redirect('/')
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO notes (user_id, content) VALUES (?, ?)",
-        (session['user_id'], content)
-    )
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-@app.route('/delete_note/<int:id>', methods=['POST'])
-def delete_note(id):
-    if not login_required():
-        return redirect('/login_page')
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "DELETE FROM notes WHERE id=? AND user_id=?",
-        (id, session['user_id'])
-    )
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-# ================= TASKS =================
-@app.route('/add_task', methods=['POST'])
-def add_task():
-    if not login_required():
-        return redirect('/login_page')
-
-    task = request.form.get('task')
-    if not task:
-        return redirect('/')
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO tasks (user_id, task) VALUES (?, ?)",
-        (session['user_id'], task)
-    )
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-@app.route('/toggle_task/<int:id>', methods=['POST'])
-def toggle_task(id):
-    if not login_required():
-        return redirect('/login_page')
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "UPDATE tasks SET done = CASE WHEN done=1 THEN 0 ELSE 1 END WHERE id=? AND user_id=?",
-        (id, session['user_id'])
-    )
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-@app.route('/delete_task/<int:id>', methods=['POST'])
-def delete_task(id):
-    if not login_required():
-        return redirect('/login_page')
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "DELETE FROM tasks WHERE id=? AND user_id=?",
-        (id, session['user_id'])
-    )
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-# ================= RUN =================
 if __name__ == "__main__":
     app.run(debug=True)
