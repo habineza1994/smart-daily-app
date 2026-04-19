@@ -1,132 +1,142 @@
-from flask import Flask, render_template, request, redirect, session, url_for
-import sqlite3
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, request, jsonify, send_file
+from flask_mysql import MySQL
+from flask_bcrypt import Bcrypt
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+import datetime
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key"
 
-# ================= DATABASE =================
-def get_db():
-    conn = sqlite3.connect("database.db")
-    conn.row_factory = sqlite3.Row
-    return conn
+app.config['MYSQL_DATABASE_HOST'] = 'localhost'
+app.config['MYSQL_DATABASE_USER'] = 'root'
+app.config['MYSQL_DATABASE_PASSWORD'] = ''
+app.config['MYSQL_DATABASE_DB'] = 'finance_db'
 
-def init_db():
-    conn = get_db()
+mysql = MySQL(app)
+bcrypt = Bcrypt(app)
 
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
-        password TEXT,
-        role TEXT DEFAULT 'user',
-        active INTEGER DEFAULT 1
-    )
-    """)
-
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS records (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        content TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# ================= AUTH =================
-@app.route("/", methods=["GET","POST"])
-def login():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-
-        conn = get_db()
-        user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
-
-        if user and check_password_hash(user["password"], password) and user["active"] == 1:
-            session["user_id"] = user["id"]
-            session["role"] = user["role"]
-
-            if user["role"] == "admin":
-                return redirect("/admin")
-            return redirect("/dashboard")
-
-        return "Login Failed"
-
-    return render_template("login.html")
-
-
-@app.route("/register", methods=["GET","POST"])
+# ---------- AUTH ----------
+@app.route('/register', methods=['POST'])
 def register():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = generate_password_hash(request.form["password"])
-
-        conn = get_db()
-        conn.execute("INSERT INTO users (username,password) VALUES (?,?)", (username,password))
-        conn.commit()
-        conn.close()
-
-        return redirect("/")
-
-    return render_template("register.html")
-
-# ================= ADMIN =================
-@app.route("/admin")
-def admin():
-    if session.get("role") != "admin":
-        return redirect("/")
-
-    conn = get_db()
-    users = conn.execute("SELECT * FROM users").fetchall()
-    records = conn.execute("""
-        SELECT records.*, users.username 
-        FROM records 
-        JOIN users ON records.user_id = users.id
-    """).fetchall()
-
-    return render_template("admin.html", users=users, records=records)
-
-
-@app.route("/disable/<int:id>")
-def disable(id):
-    conn = get_db()
-    conn.execute("UPDATE users SET active=0 WHERE id=?", (id,))
+    data = request.json
+    hashed = bcrypt.generate_password_hash(data['password']).decode('utf-8')
+    conn = mysql.connect()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO users(username,password) VALUES(%s,%s)",
+                (data['username'], hashed))
     conn.commit()
-    return redirect("/admin")
+    return jsonify({"message": "User created"})
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    conn = mysql.connect()
+    cur = conn.cursor()
+    cur.execute("SELECT password FROM users WHERE username=%s",
+                (data['username'],))
+    user = cur.fetchone()
+    if user and bcrypt.check_password_hash(user[0], data['password']):
+        return jsonify({"message": "Login success"})
+    return jsonify({"message": "Login failed"}), 401
 
 
-# ================= USER =================
-@app.route("/dashboard", methods=["GET","POST"])
-def dashboard():
-    if "user_id" not in session:
-        return redirect("/")
-
-    if request.method == "POST":
-        content = request.form["content"]
-
-        conn = get_db()
-        conn.execute("INSERT INTO records (user_id, content) VALUES (?,?)",
-                     (session["user_id"], content))
-        conn.commit()
-
-    conn = get_db()
-    records = conn.execute("SELECT * FROM records WHERE user_id=?",
-                           (session["user_id"],)).fetchall()
-
-    return render_template("user.html", records=records)
+# ---------- INCOME ----------
+@app.route('/income', methods=['POST'])
+def add_income():
+    data = request.json
+    conn = mysql.connect()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO income(amount,source,date,note) VALUES(%s,%s,%s,%s)",
+        (data['amount'], data['source'], data['date'], data['note'])
+    )
+    conn.commit()
+    return jsonify({"message": "Income added"})
 
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/")
+@app.route('/income', methods=['GET'])
+def list_income():
+    conn = mysql.connect()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM income")
+    return jsonify(cur.fetchall())
 
 
-if __name__ == "__main__":
+# ---------- EXPENSES ----------
+@app.route('/expenses', methods=['POST'])
+def add_expense():
+    data = request.json
+    conn = mysql.connect()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO expenses(amount,category,date,note) VALUES(%s,%s,%s,%s)",
+        (data['amount'], data['category'], data['date'], data['note'])
+    )
+    conn.commit()
+    return jsonify({"message": "Expense added"})
+
+
+@app.route('/expenses', methods=['GET'])
+def list_expenses():
+    conn = mysql.connect()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM expenses")
+    return jsonify(cur.fetchall())
+
+
+# ---------- ACTIVITIES ----------
+@app.route('/activities', methods=['POST'])
+def add_activity():
+    data = request.json
+    conn = mysql.connect()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO activities(activity_name,done_by,date,description) VALUES(%s,%s,%s,%s)",
+        (data['activity_name'], data['done_by'], data['date'], data['description'])
+    )
+    conn.commit()
+    return jsonify({"message": "Activity added"})
+
+
+@app.route('/activities', methods=['GET'])
+def list_activities():
+    conn = mysql.connect()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM activities")
+    return jsonify(cur.fetchall())
+
+
+# ---------- REPORT ----------
+@app.route('/report', methods=['GET'])
+def report():
+    conn = mysql.connect()
+    cur = conn.cursor()
+
+    cur.execute("SELECT SUM(amount) FROM income")
+    total_income = cur.fetchone()[0] or 0
+
+    cur.execute("SELECT SUM(amount) FROM expenses")
+    total_expense = cur.fetchone()[0] or 0
+
+    profit = total_income - total_expense
+
+    file = "report.pdf"
+    doc = SimpleDocTemplate(file)
+    styles = getSampleStyleSheet()
+
+    content = f"""
+    FINANCE REPORT
+    Date: {datetime.date.today()}
+
+    Total Income: {total_income}
+    Total Expense: {total_expense}
+    Profit: {profit}
+    """
+
+    doc.build([Paragraph(content, styles['Normal'])])
+
+    return send_file(file, as_attachment=True)
+
+
+if __name__ == '__main__':
     app.run(debug=True)
