@@ -21,7 +21,21 @@ def get_db():
         database=config.MYSQL_DB,
         cursorclass=pymysql.cursors.DictCursor
     )
-
+@app.route("/initdb")
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(100) NOT NULL,
+            password VARCHAR(255) NOT NULL
+        )
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+    return "DB Initialized"
 
 # ================= HOME =================
 @app.route("/")
