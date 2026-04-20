@@ -1,22 +1,32 @@
-from flask import Flask, request, jsonify, send_file
-from flask_mysql import MySQL
-from flask_bcrypt import Bcrypt
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
+import pymysql
+pymysql.install_as_MySQLdb()
+
+from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import datetime
 import config
-
+from flask import Flask, request, jsonify, send_file
 app = Flask(__name__)
 
+@app.route("/")
+def home():
+    return "HIRWA SMART DAILY APP IS WORKING ✅"
+
+
+def get_db():
+    return pymysql.connect(
+        host=config.MYSQL_HOST,
+        user=config.MYSQL_USER,
+        password=config.MYSQL_PASSWORD,
+        database=config.MYSQL_DB,
+        cursorclass=pymysql.cursors.DictCursor
+    )
 # ---------- CONFIG ----------
 app.config['MYSQL_DATABASE_HOST'] = config.MYSQL_HOST
 app.config['MYSQL_DATABASE_USER'] = config.MYSQL_USER
 app.config['MYSQL_DATABASE_PASSWORD'] = config.MYSQL_PASSWORD
 app.config['MYSQL_DATABASE_DB'] = config.MYSQL_DB
 
-mysql = MySQL(app)
-bcrypt = Bcrypt(app)
 
 # ---------- HELPERS ----------
 def get_user_id():
@@ -192,6 +202,5 @@ def report():
 
     return send_file(file, as_attachment=True)
 
-
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
