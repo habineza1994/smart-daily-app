@@ -1,18 +1,18 @@
 import pymysql
-pymysql.install_as_MySQLdb()
-
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import datetime
 import config
 from flask import Flask, request, jsonify, send_file
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+
 app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "HIRWA SMART DAILY APP IS WORKING ✅"
+app.config['SECRET_KEY'] = config.SECRET_KEY
 
 
+# ================= DATABASE =================
 def get_db():
     return pymysql.connect(
         host=config.MYSQL_HOST,
@@ -21,63 +21,67 @@ def get_db():
         database=config.MYSQL_DB,
         cursorclass=pymysql.cursors.DictCursor
     )
-# ---------- CONFIG ----------
-app.config['MYSQL_DATABASE_HOST'] = config.MYSQL_HOST
-app.config['MYSQL_DATABASE_USER'] = config.MYSQL_USER
-app.config['MYSQL_DATABASE_PASSWORD'] = config.MYSQL_PASSWORD
-app.config['MYSQL_DATABASE_DB'] = config.MYSQL_DB
 
 
-# ---------- HELPERS ----------
+# ================= HOME =================
+@app.route("/")
+def home():
+    return "HIRWA SMART DAILY APP IS WORKING ✅"
+
+
+# ================= TOKEN HELPER =================
 def get_user_id():
     token = request.headers.get('Authorization')
     if not token:
         return None
     try:
-        data = jwt.decode(token, config.SECRET_KEY, algorithms=['HS256'])
+        data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         return data['user_id']
     except:
         return None
 
 
-# ---------- AUTH ----------
+# ================= AUTH =================
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json
-    hashed = bcrypt.generate_password_hash(data['password']).decode('utf-8')
-    conn = mysql.connect()
-    cur = conn.cursor()
+    password = generate_password_hash(data['password'])
+
+    db = get_db()
+    cur = db.cursor()
     cur.execute(
         "INSERT INTO users(username,password) VALUES(%s,%s)",
-        (data['username'], hashed)
+        (data['username'], password)
     )
-    conn.commit()
+    db.commit()
+
     return jsonify({"message": "User created"})
 
 
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    conn = mysql.connect()
-    cur = conn.cursor()
+
+    db = get_db()
+    cur = db.cursor()
     cur.execute(
         "SELECT id, password FROM users WHERE username=%s",
         (data['username'],)
     )
     user = cur.fetchone()
 
-    if user and bcrypt.check_password_hash(user[1], data['password']):
+    if user and check_password_hash(user['password'], data['password']):
         token = jwt.encode({
-            'user_id': user[0],
+            'user_id': user['id'],
             'exp': datetime.datetime.utcnow() + datetime.timedelta(days=1)
-        }, config.SECRET_KEY, algorithm='HS256')
+        }, app.config['SECRET_KEY'], algorithm='HS256')
 
         return jsonify({"token": token})
 
     return jsonify({"message": "Login failed"}), 401
 
 
-# ---------- INCOME ----------
+# ================= INCOME =================
 @app.route('/income', methods=['POST'])
 def add_income():
     user_id = get_user_id()
@@ -85,13 +89,14 @@ def add_income():
         return jsonify({"error": "Unauthorized"}), 401
 
     data = request.json
-    conn = mysql.connect()
-    cur = conn.cursor()
+    db = get_db()
+    cur = db.cursor()
     cur.execute(
         "INSERT INTO income(amount,source,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
         (data['amount'], data['source'], data['date'], data['note'], user_id)
     )
-    conn.commit()
+    db.commit()
+
     return jsonify({"message": "Income added"})
 
 
@@ -101,13 +106,13 @@ def list_income():
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    conn = mysql.connect()
-    cur = conn.cursor()
+    db = get_db()
+    cur = db.cursor()
     cur.execute("SELECT * FROM income WHERE user_id=%s", (user_id,))
     return jsonify(cur.fetchall())
 
 
-# ---------- EXPENSES ----------
+# ================= EXPENSES =================
 @app.route('/expenses', methods=['POST'])
 def add_expense():
     user_id = get_user_id()
@@ -115,13 +120,14 @@ def add_expense():
         return jsonify({"error": "Unauthorized"}), 401
 
     data = request.json
-    conn = mysql.connect()
-    cur = conn.cursor()
+    db = get_db()
+    cur = db.cursor()
     cur.execute(
         "INSERT INTO expenses(amount,category,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
         (data['amount'], data['category'], data['date'], data['note'], user_id)
     )
-    conn.commit()
+    db.commit()
+
     return jsonify({"message": "Expense added"})
 
 
@@ -131,13 +137,13 @@ def list_expenses():
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    conn = mysql.connect()
-    cur = conn.cursor()
+    db = get_db()
+    cur = db.cursor()
     cur.execute("SELECT * FROM expenses WHERE user_id=%s", (user_id,))
     return jsonify(cur.fetchall())
 
 
-# ---------- ACTIVITIES ----------
+# ================= ACTIVITIES =================
 @app.route('/activities', methods=['POST'])
 def add_activity():
     user_id = get_user_id()
@@ -145,13 +151,14 @@ def add_activity():
         return jsonify({"error": "Unauthorized"}), 401
 
     data = request.json
-    conn = mysql.connect()
-    cur = conn.cursor()
+    db = get_db()
+    cur = db.cursor()
     cur.execute(
         "INSERT INTO activities(activity_name,done_by,date,description,user_id) VALUES(%s,%s,%s,%s,%s)",
         (data['activity_name'], data['done_by'], data['date'], data['description'], user_id)
     )
-    conn.commit()
+    db.commit()
+
     return jsonify({"message": "Activity added"})
 
 
@@ -161,27 +168,27 @@ def list_activities():
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    conn = mysql.connect()
-    cur = conn.cursor()
+    db = get_db()
+    cur = db.cursor()
     cur.execute("SELECT * FROM activities WHERE user_id=%s", (user_id,))
     return jsonify(cur.fetchall())
 
 
-# ---------- REPORT ----------
+# ================= REPORT PDF =================
 @app.route('/report', methods=['GET'])
 def report():
     user_id = get_user_id()
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    conn = mysql.connect()
-    cur = conn.cursor()
+    db = get_db()
+    cur = db.cursor()
 
-    cur.execute("SELECT SUM(amount) FROM income WHERE user_id=%s", (user_id,))
-    total_income = cur.fetchone()[0] or 0
+    cur.execute("SELECT SUM(amount) AS total FROM income WHERE user_id=%s", (user_id,))
+    total_income = cur.fetchone()['total'] or 0
 
-    cur.execute("SELECT SUM(amount) FROM expenses WHERE user_id=%s", (user_id,))
-    total_expense = cur.fetchone()[0] or 0
+    cur.execute("SELECT SUM(amount) AS total FROM expenses WHERE user_id=%s", (user_id,))
+    total_expense = cur.fetchone()['total'] or 0
 
     profit = total_income - total_expense
 
@@ -202,5 +209,7 @@ def report():
 
     return send_file(file, as_attachment=True)
 
+
+# ================= RUN =================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
