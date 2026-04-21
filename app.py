@@ -156,21 +156,15 @@ def get_users():
 
     try:
         token = token.split(" ")[1]
-        data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-        user_id = data['user_id']
+        jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
 
-        cursor = mysql.connection.cursor()
+        conn = get_db()
+        cursor = conn.cursor()
         cursor.execute("SELECT id, username FROM users")
         users = cursor.fetchall()
+        conn.close()
 
-        result = []
-        for u in users:
-            result.append({
-                "id": u[0],
-                "username": u[1]
-            })
-
-        return jsonify(result)
+        return jsonify(users)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 401
