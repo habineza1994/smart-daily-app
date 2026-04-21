@@ -109,44 +109,85 @@ def get_user_id():
 
 
 # ================= AUTH =================
-@app.route('/register', methods=['POST'])
+@app.route('/register', methods=['GET', 'POST'])
 def register():
-    data = request.json
-    password = generate_password_hash(data['password'])
-
     db = get_db()
     cur = db.cursor()
-    cur.execute(
-        "INSERT INTO users(username,password) VALUES(%s,%s)",
-        (data['username'], password)
-    )
-    db.commit()
 
-    return jsonify({"message": "User created"})
+    if request.method == 'POST':
+        # niba ari JSON (API)
+        if request.is_json:
+            data = request.get_json()
+            username = data['username']
+            password = generate_password_hash(data['password'])
+        else:
+            # niba ari Form (WebIntoApp / Browser)
+            username = request.form['username']
+            password = generate_password_hash(request.form['password'])
 
+        cur.execute(
+            "INSERT INTO users(username, password) VALUES (%s, %s)",
+            (username, password)
+        )
+        db.commit()
 
-@app.route('/login', methods=['POST'])
+        return "User created successfully!"
+
+    # GET → Erekana form
+    return """
+    <h2>Register - HIRWA SMART</h2>
+    <form method="POST">
+        Username: <input name="username"><br><br>
+        Password: <input name="password" type="password"><br><br>
+        <button type="submit">Register</button>
+    </form>
+    """
+
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    data = request.json
-
     db = get_db()
     cur = db.cursor()
-    cur.execute(
-        "SELECT id, password FROM users WHERE username=%s",
-        (data['username'],)
-    )
-    user = cur.fetchone()
 
-    if user and check_password_hash(user['password'], data['password']):
-        token = jwt.encode({
-            'user_id': user['id'],
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=1)
-        }, app.config['SECRET_KEY'], algorithm='HS256')
+    if request.method == 'POST':
+        # Niba ari JSON (API)
+        if request.is_json:
+            data = request.get_json()
+            username = data['username']
+            password = data['password']
+        else:
+            # Niba ari Form (Browser / WebIntoApp)
+            username = request.form['username']
+            password = request.form['password']
 
-        return jsonify({"token": token})
+        cur.execute(
+            "SELECT id, password FROM users WHERE username=%s",
+            (username,)
+        )
+        user = cur.fetchone()
 
-    return jsonify({"message": "Login failed"}), 401
+        if user and check_password_hash(user['password'], password):
+            token = jwt.encode({
+                'user_id': user['id'],
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+            }, app.config['SECRET_KEY'], algorithm="HS256")
 
+            return f"""
+            <h3>Login Successful ✅</h3>
+            <p>Your token:</p>
+            <textarea rows="5" cols="50">{token}</textarea>
+            """
+
+        return "Login failed ❌"
+
+    # GET → Erekana form
+    return """
+    <h2>Login - HIRWA SMART</h2>
+    <form method="POST">
+        Username: <input name="username"><br><br>
+        Password: <input name="password" type="password"><br><br>
+        <button type="submit">Login</button>
+    </form>
+    """
 @app.route('/users', methods=['GET'])
 def get_users():
     token = request.headers.get('Authorization')
