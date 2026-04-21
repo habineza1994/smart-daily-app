@@ -150,7 +150,33 @@ def login():
 
     return jsonify({"message": "Login failed"}), 401
 
+@app.route('/users', methods=['GET'])
+def get_users():
+    token = request.headers.get('Authorization')
 
+    if not token:
+        return jsonify({"message": "Token is missing"}), 401
+
+    try:
+        token = token.split(" ")[1]
+        data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+        user_id = data['user_id']
+
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT id, username FROM users")
+        users = cursor.fetchall()
+
+        result = []
+        for u in users:
+            result.append({
+                "id": u[0],
+                "username": u[1]
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
 # ================= INCOME =================
 @app.route('/income', methods=['POST'])
 def add_income():
