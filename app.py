@@ -265,97 +265,88 @@ def get_users():
     except Exception as e:
         return jsonify({"error": str(e)}), 401
 # ================= INCOME =================
-@app.route('/income', methods=['POST'])
-def add_income():
-    user_id = get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.json
+@app.route('/income', methods=['GET', 'POST'])
+def income():
     db = get_db()
     cur = db.cursor()
-    cur.execute(
-        "INSERT INTO income(amount,source,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
-        (data['amount'], data['source'], data['date'], data['note'], user_id)
-    )
-    db.commit()
 
-    return jsonify({"message": "Income added"})
+    if request.method == 'POST':
+        amount = request.form['amount']
+        source = request.form['source']
+        date = request.form['date']
+        note = request.form['note']
 
+        cur.execute(
+            "INSERT INTO income(amount,source,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
+            (amount, source, date, note, 1)
+        )
+        db.commit()
+        return redirect('/income-page')
 
-@app.route('/income', methods=['GET'])
-def list_income():
-    user_id = get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
+    cur.execute("SELECT * FROM income")
+    rows = cur.fetchall()
 
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM income WHERE user_id=%s", (user_id,))
-    return jsonify(cur.fetchall())
+    table = "<h3>All Income</h3>"
+    for r in rows:
+        table += f"{r['amount']} - {r['source']} - {r['date']}<br>"
 
+    return table
 
 # ================= EXPENSES =================
-@app.route('/expenses', methods=['POST'])
-def add_expense():
-    user_id = get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.json
+@app.route('/expenses', methods=['GET', 'POST'])
+def expenses():
     db = get_db()
     cur = db.cursor()
-    cur.execute(
-        "INSERT INTO expenses(amount,category,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
-        (data['amount'], data['category'], data['date'], data['note'], user_id)
-    )
-    db.commit()
 
-    return jsonify({"message": "Expense added"})
+    if request.method == 'POST':
+        amount = request.form['amount']
+        category = request.form['category']
+        date = request.form['date']
+        note = request.form['note']
 
+        cur.execute(
+            "INSERT INTO expenses(amount,category,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
+            (amount, category, date, note, 1)
+        )
+        db.commit()
+        return redirect('/expenses-page')
 
-@app.route('/expenses', methods=['GET'])
-def list_expenses():
-    user_id = get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
+    cur.execute("SELECT * FROM expenses")
+    rows = cur.fetchall()
 
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM expenses WHERE user_id=%s", (user_id,))
-    return jsonify(cur.fetchall())
+    table = "<h3>All Expenses</h3>"
+    for r in rows:
+        table += f"{r['amount']} - {r['category']} - {r['date']}<br>"
 
+    return table
 
 # ================= ACTIVITIES =================
-@app.route('/activities', methods=['POST'])
-def add_activity():
-    user_id = get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.json
+@app.route('/activities', methods=['GET', 'POST'])
+def activities():
     db = get_db()
     cur = db.cursor()
-    cur.execute(
-        "INSERT INTO activities(activity_name,done_by,date,description,user_id) VALUES(%s,%s,%s,%s,%s)",
-        (data['activity_name'], data['done_by'], data['date'], data['description'], user_id)
-    )
-    db.commit()
 
-    return jsonify({"message": "Activity added"})
+    if request.method == 'POST':
+        name = request.form['activity_name']
+        done_by = request.form['done_by']
+        date = request.form['date']
+        desc = request.form['description']
 
+        cur.execute(
+            "INSERT INTO activities(activity_name,done_by,date,description,user_id) VALUES(%s,%s,%s,%s,%s)",
+            (name, done_by, date, desc, 1)
+        )
+        db.commit()
+        return redirect('/activities-page')
 
-@app.route('/activities', methods=['GET'])
-def list_activities():
-    user_id = get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
+    cur.execute("SELECT * FROM activities")
+    rows = cur.fetchall()
 
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM activities WHERE user_id=%s", (user_id,))
-    return jsonify(cur.fetchall())
+    table = "<h3>All Activities</h3>"
+    for r in rows:
+        table += f"{r['activity_name']} - {r['date']}<br>"
 
+    return table
 
 # ================= REPORT PDF =================
 @app.route('/report', methods=['GET'])
