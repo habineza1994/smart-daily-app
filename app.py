@@ -19,6 +19,7 @@ def get_db():
         user=config.MYSQL_USER,
         password=config.MYSQL_PASSWORD,
         database=config.MYSQL_DB,
+        port=int(os.environ.get("MYSQLPORT")),
         cursorclass=pymysql.cursors.DictCursor
     )
 @app.route("/initdb")
