@@ -1,18 +1,22 @@
 import os
-import pymysql
-from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import datetime
 import config
-from flask import Flask, request, jsonify, send_file
 
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
+from flask import Flask, request, jsonify, send_file
+from flask_mysqldb import MySQL
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = config.SECRET_KEY
 
+# ===== MySQL from Railway variables =====
+app.config['MYSQL_HOST'] = os.environ.get('MYSQLHOST')
+app.config['MYSQL_USER'] = os.environ.get('MYSQLUSER')
+app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQLPASSWORD')
+app.config['MYSQL_DB'] = os.environ.get('MYSQLDATABASE')
 
+mysql = MySQL(app)
 # ================= DATABASE =================
 def get_db():
     return pymysql.connect(
