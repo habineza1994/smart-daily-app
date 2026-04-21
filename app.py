@@ -26,18 +26,56 @@ def get_db():
 def init_db():
     conn = get_db()
     cur = conn.cursor()
+
+    # USERS
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(100) NOT NULL,
-            password VARCHAR(255) NOT NULL
-        )
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(100) NOT NULL,
+        password VARCHAR(255) NOT NULL
+    )
     """)
+
+    # INCOME
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS income (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        amount DECIMAL(10,2),
+        source VARCHAR(255),
+        date DATE,
+        note TEXT,
+        user_id INT
+    )
+    """)
+
+    # EXPENSES
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS expenses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        amount DECIMAL(10,2),
+        category VARCHAR(255),
+        date DATE,
+        note TEXT,
+        user_id INT
+    )
+    """)
+
+    # ACTIVITIES
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS activities (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        activity_name VARCHAR(255),
+        done_by VARCHAR(255),
+        date DATE,
+        description TEXT,
+        user_id INT
+    )
+    """)
+
     conn.commit()
     cur.close()
     conn.close()
-    return "DB Initialized"
-
+    return "ALL TABLES CREATED"
 # ================= TEST DB =================
 @app.route("/testdb")
 def test_db():
