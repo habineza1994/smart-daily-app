@@ -142,6 +142,7 @@ def register():
         <button type="submit">Register</button>
     </form>
     """
+from flask import redirect
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -149,13 +150,11 @@ def login():
     cur = db.cursor()
 
     if request.method == 'POST':
-        # Niba ari JSON (API)
         if request.is_json:
             data = request.get_json()
             username = data['username']
             password = data['password']
         else:
-            # Niba ari Form (Browser / WebIntoApp)
             username = request.form['username']
             password = request.form['password']
 
@@ -171,15 +170,11 @@ def login():
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
             }, app.config['SECRET_KEY'], algorithm="HS256")
 
-            return f"""
-            <h3>Login Successful ✅</h3>
-            <p>Your token:</p>
-            <textarea rows="5" cols="50">{token}</textarea>
-            """
+            # aha ni ho redirect ijya
+            return redirect('/dashboard')
 
         return "Login failed ❌"
 
-    # GET → Erekana form
     return """
     <h2>Login - HIRWA SMART</h2>
     <form method="POST">
@@ -187,6 +182,66 @@ def login():
         Password: <input name="password" type="password"><br><br>
         <button type="submit">Login</button>
     </form>
+    """
+@app.route('/dashboard')
+def dashboard():
+    return """
+    <h2>HIRWA SMART Dashboard</h2>
+    <ul>
+        <li><a href="/income-page">Manage Income</a></li>
+        <li><a href="/expenses-page">Manage Expenses</a></li>
+        <li><a href="/activities-page">Manage Activities</a></li>
+        <li><a href="/report-page">Download Report</a></li>
+    </ul>
+    """
+@app.route('/income-page')
+def income_page():
+    return """
+    <h3>Add Income</h3>
+    <form action="/income" method="post">
+        Amount: <input name="amount"><br>
+        Source: <input name="source"><br>
+        Date: <input name="date" type="date"><br>
+        Note: <input name="note"><br>
+        <button type="submit">Save</button>
+    </form>
+    <br>
+    <a href="/dashboard">Back</a>
+    """
+@app.route('/expenses-page')
+def expenses_page():
+    return """
+    <h3>Add Expense</h3>
+    <form action="/expenses" method="post">
+        Amount: <input name="amount"><br>
+        Category: <input name="category"><br>
+        Date: <input name="date" type="date"><br>
+        Note: <input name="note"><br>
+        <button type="submit">Save</button>
+    </form>
+    <br>
+    <a href="/dashboard">Back</a>
+    """
+@app.route('/activities-page')
+def activities_page():
+    return """
+    <h3>Add Activity</h3>
+    <form action="/activities" method="post">
+        Activity Name: <input name="activity_name"><br>
+        Done By: <input name="done_by"><br>
+        Date: <input name="date" type="date"><br>
+        Description: <input name="description"><br>
+        <button type="submit">Save</button>
+    </form>
+    <br>
+    <a href="/dashboard">Back</a>
+    """
+@app.route('/report-page')
+def report_page():
+    return """
+    <h3>Finance Report</h3>
+    <a href="/report">Download PDF Report</a><br><br>
+    <a href="/dashboard">Back</a>
     """
 @app.route('/users', methods=['GET'])
 def get_users():
