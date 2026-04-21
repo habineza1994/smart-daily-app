@@ -279,7 +279,9 @@ def report():
 
     return send_file(file, as_attachment=True)
 
-
+@app.errorhandler(Exception)
+def handle_exception(e):
+    return f"SERVER ERROR:\n{e}", 500
 # ================= RUN =================
 import os
 
