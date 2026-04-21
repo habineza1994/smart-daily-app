@@ -41,6 +41,22 @@ def init_db():
     conn.close()
     return "DB Initialized"
 
+# ================= TEST DB =================
+@app.route("/testdb")
+def test_db():
+    import os, pymysql
+    try:
+        conn = pymysql.connect(
+            host=os.environ.get("MYSQLHOST"),
+            user=os.environ.get("MYSQLUSER"),
+            password=os.environ.get("MYSQLPASSWORD"),
+            database=os.environ.get("MYSQLDATABASE"),
+            port=int(os.environ.get("MYSQLPORT")),
+        )
+        conn.close()
+        return "DB OK"
+    except Exception as e:
+        return f"DB ERROR: {e}"
 # ================= HOME =================
 @app.route("/")
 def home():
