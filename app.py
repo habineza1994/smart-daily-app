@@ -22,7 +22,7 @@ def get_db():
         user=os.environ.get("MYSQLUSER"),
         password=os.environ.get("MYSQLPASSWORD"),
         database=os.environ.get("MYSQLDATABASE"),
-        port=int(os.environ.get("MYSQLPORT")),
+        port=int(os.environ.get("MYSQLPORT", 3306))
         cursorclass=pymysql.cursors.DictCursor
     )
 @app.route("/initdb")
@@ -51,7 +51,7 @@ def test_db():
             user=os.environ.get("MYSQLUSER"),
             password=os.environ.get("MYSQLPASSWORD"),
             database=os.environ.get("MYSQLDATABASE"),
-            port=int(os.environ.get("MYSQLPORT")),
+            port=int(os.environ.get("MYSQLPORT", 3306))
         )
         conn.close()
         return "DB OK"
@@ -248,5 +248,5 @@ def report():
 import os
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port=int(os.environ.get("MYSQLPORT", 3306))
     app.run(host="0.0.0.0", port=port)
