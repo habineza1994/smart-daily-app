@@ -5,3 +5,4 @@ werkzeug
 pymysql
 reportlab
 pyjwt
+Flask-MySQLdb
