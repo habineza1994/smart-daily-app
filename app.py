@@ -891,6 +891,12 @@ def fix_db():
 
     db.commit()
     return "DB FIXED ✅"
+@app.errorhandler(Exception)
+def handle_error(e):
+    return f"""
+    <h2>SERVER ERROR</h2>
+    <pre>{e}</pre>
+    """, 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
