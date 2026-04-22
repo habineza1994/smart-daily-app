@@ -453,6 +453,37 @@ def activities():
     html += '<br><a href="/dashboard">Back</a>'
     return html
 
+@app.route("/fixdb")
+def fix_db():
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+    ALTER TABLE income
+    ADD COLUMN user VARCHAR(100),
+    ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN updated_at DATETIME NULL,
+    ADD COLUMN deleted_at DATETIME NULL;
+    """)
+
+    cur.execute("""
+    ALTER TABLE expenses
+    ADD COLUMN user VARCHAR(100),
+    ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN updated_at DATETIME NULL,
+    ADD COLUMN deleted_at DATETIME NULL;
+    """)
+
+    cur.execute("""
+    ALTER TABLE activities
+    ADD COLUMN user VARCHAR(100),
+    ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN updated_at DATETIME NULL,
+    ADD COLUMN deleted_at DATETIME NULL;
+    """)
+
+    db.commit()
+    return "DB FIXED ✅"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
