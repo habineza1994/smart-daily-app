@@ -747,8 +747,7 @@ def activities():
         desc = request.form["description"]
 
         cur.execute(
-INSERT INTO activities (name, description, date)
-VALUES     (name, done_by, date, desc)
+         INSERT INTO activities (name, description, date)  (name, done_by, date, desc)
         )
         conn.commit()
 
