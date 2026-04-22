@@ -727,48 +727,133 @@ def expenses_excel():
     wb.save(file)
     return send_file(file, as_attachment=True)
 # ================= ACTIVITIES =================
-@app.route('/activities', methods=['GET','POST'])
+
+
+@app.route("/activities", methods=["GET","POST"])
 def activities():
-    if 'user_id' not in session:
-        return redirect('/login')
+    conn = get_db()
+    cur = conn.cursor()
 
-    db = get_db()
-    cur = db.cursor()
+    if request.method == "POST":
+        name = request.form["name"]
+        done_by = request.form["done_by"]
+        date = request.form["date"]
+        desc = request.form["description"]
 
-    if request.method == 'POST':
-        cur.execute("""
-        INSERT INTO activities(activity_name,done_by,date,description,user_id)
-        VALUES(%s,%s,%s,%s,%s)
-        """, (
-            request.form['activity_name'],
-            request.form['done_by'],
-            request.form['date'],
-            request.form['description'],
-            session['user_id']
-        ))
-        db.commit()
+        cur.execute(
+            "INSERT INTO activities (name, done_by, date, description) VALUES (%s,%s,%s,%s)",
+            (name, done_by, date, desc)
+        )
+        conn.commit()
 
-    cur.execute("SELECT * FROM activities WHERE user_id=%s ORDER BY id DESC", (session['user_id'],))
+    cur.execute("SELECT name, date FROM activities ORDER BY date DESC")
     rows = cur.fetchall()
 
-    html = """
-    <h3>Add Activity</h3>
-    <form method="POST">
-    Activity Name:<input name="activity_name"><br>
-    Done By:<input name="done_by"><br>
-    Date:<input type="date" name="date"><br>
-    Description:<input name="description"><br>
-    <button>Save</button>
-    </form><hr>
-    <h3>All Activities</h3>
-    """
-
+    html_rows = ""
     for r in rows:
-        html += f"{r['activity_name']} - {r['date']}<br>"
+        html_rows += f"""
+        <div class='activity-item'>
+            <div>
+                <div class='act-name'>{r[0]}</div>
+                <div class='act-date'>{r[1]}</div>
+            </div>
+        </div>
+        """
 
-    html += '<br><a href="/dashboard">Back</a>'
-    return html
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<title>Activities - HIRWA SMART</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
+<style>
+body{{
+    margin:0;
+    font-family: Arial, Helvetica, sans-serif;
+    background:#f4f6fb;
+}}
+
+.header{{
+    background:linear-gradient(90deg,#4e54c8,#8f94fb);
+    color:white;
+    padding:18px;
+    text-align:center;
+    font-size:20px;
+    font-weight:bold;
+}}
+
+.container{{
+    padding:15px;
+}}
+
+.card{{
+    background:white;
+    border-radius:15px;
+    padding:15px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    margin-bottom:15px;
+}}
+
+input, textarea{{
+    width:100%;
+    padding:12px;
+    margin:8px 0;
+    border-radius:10px;
+    border:1px solid #ddd;
+    font-size:15px;
+}}
+
+button{{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#4e54c8;
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+}}
+
+.activity-item{{
+    background:#eef1ff;
+    padding:12px;
+    border-radius:10px;
+    margin-bottom:10px;
+}}
+
+.act-name{{ font-weight:bold; }}
+.act-date{{ color:gray; font-size:14px; }}
+</style>
+</head>
+
+<body>
+
+<div class="header">HIRWA SMART - Activities</div>
+
+<div class="container">
+
+    <div class="card">
+        <h3>Add Activity</h3>
+        <form method="POST">
+            <input name="name" placeholder="Activity name" required>
+            <input name="done_by" placeholder="Done by" required>
+            <input type="date" name="date" required>
+            <textarea name="description" placeholder="Description"></textarea>
+            <button type="submit">Save Activity</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>All Activities</h3>
+        {html_rows}
+    </div>
+
+</div>
+
+</body>
+</html>
+"""
 @app.route("/fixdb")
 def fix_db():
     db = get_db()
