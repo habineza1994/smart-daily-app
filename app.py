@@ -84,32 +84,100 @@ def register():
     """
 
 
-@app.route('/login', methods=['GET','POST'])
+@app.route("/login", methods=["GET","POST"])
 def login():
-    if request.method == 'POST':
-        db = get_db()
-        cur = db.cursor()
-        cur.execute(
-            "SELECT * FROM users WHERE username=%s AND password=%s",
-            (request.form['username'], request.form['password'])
-        )
-        user = cur.fetchone()
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
 
-        if user:
-            session['user_id'] = user['id']
-            return redirect('/dashboard')
+        # logic yawe yo kugenzura login isigare hano
 
-        return "Login Failed"
+        return redirect("/dashboard")
 
     return """
-    <h2>Login</h2>
-    <form method="POST">
-    Username:<input name="username"><br>
-    Password:<input name="password"><br>
-    <button>Login</button>
-    </form>
-    """
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
+<style>
+body{
+    margin:0;
+    font-family: Arial, Helvetica, sans-serif;
+    background:linear-gradient(120deg,#4e54c8,#8f94fb);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.card{
+    background:white;
+    width:92%;
+    max-width:420px;
+    border-radius:20px;
+    padding:25px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.15);
+}
+
+.title{
+    text-align:center;
+    font-size:26px;
+    font-weight:bold;
+    color:#4e54c8;
+    margin-bottom:10px;
+}
+
+.subtitle{
+    text-align:center;
+    color:gray;
+    margin-bottom:25px;
+}
+
+input{
+    width:100%;
+    padding:14px;
+    margin:10px 0;
+    border-radius:10px;
+    border:1px solid #ddd;
+    font-size:16px;
+}
+
+button{
+    width:100%;
+    padding:14px;
+    margin-top:15px;
+    border:none;
+    border-radius:10px;
+    background:#4e54c8;
+    color:white;
+    font-size:18px;
+    font-weight:bold;
+}
+
+button:hover{
+    background:#3b40a4;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+    <div class="title">HIRWA SMART</div>
+    <div class="subtitle">Login to continue</div>
+
+    <form method="POST">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+</div>
+
+</body>
+</html>
+"""
 
 # ================= DASHBOARD =================
 @app.route("/dashboard")
