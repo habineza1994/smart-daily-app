@@ -165,7 +165,10 @@ button:hover{
 <body>
 
 <div class="card">
-    <div class="title">HIRWA SMART</div>
+<div class="header" style="display:flex;justify-content:space-between;align-items:center;">
+    <span>HIRWA SMART</span>
+    <a href="/logout" style="color:white;text-decoration:none;font-size:14px;">Logout</a>
+</div>
     <div class="subtitle">Login to continue</div>
 
     <form method="POST">
@@ -178,7 +181,10 @@ button:hover{
 </body>
 </html>
 """
-
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 # ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
