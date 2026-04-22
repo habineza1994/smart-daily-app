@@ -112,18 +112,118 @@ def login():
 
 
 # ================= DASHBOARD =================
-@app.route('/dashboard')
+@app.route("/dashboard")
 def dashboard():
-    if 'user_id' not in session:
-        return redirect('/login')
-
     return """
-    <h2>HIRWA SMART Dashboard</h2>
-    <a href="/income">Income</a><br>
-    <a href="/expenses">Expenses</a><br>
-    <a href="/activities">Activities</a><br>
-    """
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
+<style>
+body{
+    margin:0;
+    font-family: Arial, Helvetica, sans-serif;
+    background:#f4f6fb;
+}
+
+.header{
+    background:linear-gradient(90deg,#4e54c8,#8f94fb);
+    color:white;
+    padding:20px;
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+}
+
+.welcome{
+    padding:20px;
+    color:white;
+}
+
+.card{
+    background:white;
+    margin:15px;
+    padding:18px;
+    border-radius:15px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.08);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    text-decoration:none;
+}
+
+.card h2{
+    margin:0;
+}
+
+.income{ border-left:8px solid #28a745; }
+.expense{ border-left:8px solid #dc3545; }
+.activity{ border-left:8px solid #007bff; }
+
+.summary{
+    margin:15px;
+    background:white;
+    padding:15px;
+    border-radius:15px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.08);
+}
+
+.summary-box{
+    display:flex;
+    justify-content:space-between;
+    margin-top:10px;
+}
+
+.box{
+    width:32%;
+    padding:12px;
+    border-radius:10px;
+    color:white;
+    text-align:center;
+    font-weight:bold;
+}
+
+.income-box{ background:#28a745; }
+.expense-box{ background:#dc3545; }
+.balance-box{ background:#007bff; }
+
+a{ color:black; text-decoration:none; }
+</style>
+</head>
+
+<body>
+
+<div class="header">HIRWA SMART</div>
+
+<div class="card income" onclick="location.href='/income'">
+    <h2>💰 Income</h2>
+    <span>Track your income</span>
+</div>
+
+<div class="card expense" onclick="location.href='/expenses'">
+    <h2>💸 Expenses</h2>
+    <span>Track your expenses</span>
+</div>
+
+<div class="card activity" onclick="location.href='/activities'">
+    <h2>📋 Activities</h2>
+    <span>View activities</span>
+</div>
+
+<div class="summary">
+    <h3>Summary</h3>
+    <div class="summary-box">
+        <div class="box income-box">Income<br>RWF 0</div>
+        <div class="box expense-box">Expenses<br>RWF 0</div>
+        <div class="box balance-box">Balance<br>RWF 0</div>
+    </div>
+</div>
+
+</body>
+</html>
+"""
 
 # ================= INCOME =================
 from flask import Response
