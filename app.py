@@ -733,35 +733,116 @@ def expenses_excel():
     wb.save(file)
     return send_file(file, as_attachment=True)
 # ================= ACTIVITIES =================
-
-
-@app.route("/activities", methods=["GET","POST"])
+# ================= ACTIVITIES =================
+@app.route("/activities", methods=["GET", "POST"])
 def activities():
     conn = get_db()
     cur = conn.cursor()
 
-    if request.method == "POST":
-        name = request.form["name"]
+    user_id = session.get("user_id")
+
+    # 🔐 must be logged in (optional protection)
+    if not user_id:
+        return redirect("/login")
+
+    # ================= ADD ACTIVITY =================
+    if request.method == "POST" and "edit_id" not in request.form:
+        activity_name = request.form["name"]
         done_by = request.form["done_by"]
         date = request.form["date"]
         desc = request.form["description"]
 
-        cur.execute(
-         INSERT INTO activities (name, description, date)  (name, done_by, date, desc)
-        )
-        conn.commit()
+        cur.execute("""
+            INSERT INTO activities
+            (activity_name, done_by, date, description, user_id, created_at)
+            VALUES (%s,%s,%s,%s,%s,NOW())
+        """, (activity_name, done_by, date, desc, user_id))
 
-    cur.execute("SELECT name, date FROM activities ORDER BY date DESC")
+        conn.commit()
+        return redirect("/activities")
+
+    # ================= EDIT LOAD =================
+    edit_id = request.args.get("edit")
+    edit_data = None
+
+    if edit_id:
+        cur.execute("SELECT * FROM activities WHERE id=%s", (edit_id,))
+        edit_data = cur.fetchone()
+
+    # ================= UPDATE =================
+    if request.method == "POST" and "edit_id" in request.form:
+        cur.execute("""
+            UPDATE activities
+            SET activity_name=%s,
+                done_by=%s,
+                date=%s,
+                description=%s,
+                updated_at=NOW()
+            WHERE id=%s AND user_id=%s
+        """, (
+            request.form["name"],
+            request.form["done_by"],
+            request.form["date"],
+            request.form["description"],
+            request.form["edit_id"],
+            user_id
+        ))
+        conn.commit()
+        return redirect("/activities")
+
+    # ================= DELETE (SOFT = REJECTED) =================
+    delete_id = request.args.get("delete")
+    if delete_id:
+        cur.execute("""
+            UPDATE activities
+            SET deleted_at=NOW()
+            WHERE id=%s AND user_id=%s
+        """, (delete_id, user_id))
+        conn.commit()
+        return redirect("/activities")
+
+    # ================= APPROVE / REJECT =================
+    approve_id = request.args.get("approve")
+    reject_id = request.args.get("reject")
+
+    if approve_id:
+        cur.execute("""
+            UPDATE activities SET status='approved'
+            WHERE id=%s AND user_id=%s
+        """, (approve_id, user_id))
+        conn.commit()
+        return redirect("/activities")
+
+    if reject_id:
+        cur.execute("""
+            UPDATE activities SET status='rejected'
+            WHERE id=%s AND user_id=%s
+        """, (reject_id, user_id))
+        conn.commit()
+        return redirect("/activities")
+
+    # ================= FETCH =================
+    cur.execute("""
+        SELECT * FROM activities
+        WHERE user_id=%s AND deleted_at IS NULL
+        ORDER BY id DESC
+    """, (user_id,))
     rows = cur.fetchall()
 
     html_rows = ""
     for r in rows:
         html_rows += f"""
         <div class='activity-item'>
-            <div>
-                <div class='act-name'>{r[0]}</div>
-                <div class='act-date'>{r[1]}</div>
-            </div>
+            <b>{r['activity_name']}</b>
+            <small>({r.get('status','pending')})</small><br>
+
+            👤 {r['done_by']} | 📅 {r['date']}<br>
+            📝 {r['description']}<br>
+
+            <a href="/activities?edit={r['id']}">Edit</a> |
+            <a href="/activities?delete={r['id']}">Delete</a> |
+            <a href="/activities?approve={r['id']}">Approve</a> |
+            <a href="/activities?reject={r['id']}">Reject</a>
         </div>
         """
 
@@ -773,62 +854,13 @@ def activities():
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body{{
-    margin:0;
-    font-family: Arial, Helvetica, sans-serif;
-    background:#f4f6fb;
-}}
-
-.header{{
-    background:linear-gradient(90deg,#4e54c8,#8f94fb);
-    color:white;
-    padding:18px;
-    text-align:center;
-    font-size:20px;
-    font-weight:bold;
-}}
-
-.container{{
-    padding:15px;
-}}
-
-.card{{
-    background:white;
-    border-radius:15px;
-    padding:15px;
-    box-shadow:0 4px 12px rgba(0,0,0,0.08);
-    margin-bottom:15px;
-}}
-
-input, textarea{{
-    width:100%;
-    padding:12px;
-    margin:8px 0;
-    border-radius:10px;
-    border:1px solid #ddd;
-    font-size:15px;
-}}
-
-button{{
-    width:100%;
-    padding:14px;
-    border:none;
-    border-radius:10px;
-    background:#4e54c8;
-    color:white;
-    font-size:16px;
-    font-weight:bold;
-}}
-
-.activity-item{{
-    background:#eef1ff;
-    padding:12px;
-    border-radius:10px;
-    margin-bottom:10px;
-}}
-
-.act-name{{ font-weight:bold; }}
-.act-date{{ color:gray; font-size:14px; }}
+body{{margin:0;font-family:Arial;background:#f4f6fb;}}
+.header{{background:linear-gradient(90deg,#4e54c8,#8f94fb);color:white;padding:18px;text-align:center;font-size:20px;font-weight:bold;}}
+.container{{padding:15px;}}
+.card{{background:white;border-radius:15px;padding:15px;box-shadow:0 4px 12px rgba(0,0,0,0.08);margin-bottom:15px;}}
+input,textarea{{width:100%;padding:12px;margin:8px 0;border-radius:10px;border:1px solid #ddd;}}
+button{{width:100%;padding:14px;border:none;border-radius:10px;background:#4e54c8;color:white;font-weight:bold;}}
+.activity-item{{background:#eef1ff;padding:12px;border-radius:10px;margin-bottom:10px;}}
 </style>
 </head>
 
@@ -838,21 +870,31 @@ button{{
 
 <div class="container">
 
-    <div class="card">
-        <h3>Add Activity</h3>
-        <form method="POST">
-            <input name="name" placeholder="Activity name" required>
-            <input name="done_by" placeholder="Done by" required>
-            <input type="date" name="date" required>
-            <textarea name="description" placeholder="Description"></textarea>
-            <button type="submit">Save Activity</button>
-        </form>
-    </div>
+<div class="card">
+<h3>Add / Edit Activity</h3>
 
-    <div class="card">
-        <h3>All Activities</h3>
-        {html_rows}
-    </div>
+<form method="POST">
+<input name="name" placeholder="Activity name"
+value="{edit_data['activity_name'] if edit_data else ''}" required>
+
+<input name="done_by" placeholder="Done by"
+value="{edit_data['done_by'] if edit_data else ''}" required>
+
+<input type="date" name="date"
+value="{edit_data['date'] if edit_data else ''}" required>
+
+<textarea name="description" placeholder="Description">{edit_data['description'] if edit_data else ''}</textarea>
+
+{"<input type='hidden' name='edit_id' value='"+str(edit_data['id'])+"'>" if edit_data else ""}
+
+<button type="submit">Save</button>
+</form>
+</div>
+
+<div class="card">
+<h3>All Activities</h3>
+{html_rows}
+</div>
 
 </div>
 
