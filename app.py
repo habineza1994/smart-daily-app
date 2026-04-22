@@ -126,6 +126,13 @@ def dashboard():
 
 
 # ================= INCOME =================
+from flask import Response
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from openpyxl import Workbook
+from docx import Document
+
+
 @app.route('/income', methods=['GET','POST'])
 def income():
     if 'user_id' not in session:
@@ -133,7 +140,16 @@ def income():
 
     db = get_db()
     cur = db.cursor()
+    user_id = session['user_id']
 
+    # ===== DELETE =====
+    delete_id = request.args.get('delete')
+    if delete_id:
+        cur.execute("DELETE FROM income WHERE id=%s AND user_id=%s", (delete_id, user_id))
+        db.commit()
+        return redirect('/income')
+
+    # ===== ADD =====
     if request.method == 'POST':
         cur.execute("""
         INSERT INTO income(amount,source,date,note,user_id)
@@ -143,31 +159,116 @@ def income():
             request.form['source'],
             request.form['date'],
             request.form['note'],
-            session['user_id']
+            user_id
         ))
         db.commit()
 
-    cur.execute("SELECT * FROM income WHERE user_id=%s ORDER BY id DESC", (session['user_id'],))
+    # ===== FETCH =====
+    cur.execute("SELECT * FROM income WHERE user_id=%s ORDER BY id DESC", (user_id,))
     rows = cur.fetchall()
 
-    html = """
-    <h3>Add Income</h3>
+    total = sum(float(r['amount']) for r in rows)
+
+    # ===== HTML =====
+    html = f"""
+    <h2>Add Income</h2>
     <form method="POST">
     Amount:<input name="amount"><br>
     Source:<input name="source"><br>
     Date:<input type="date" name="date"><br>
     Note:<input name="note"><br>
     <button>Save</button>
-    </form><hr>
-    <h3>All Income</h3>
+    </form>
+
+    <h3>Total Income: {total}</h3>
+
+    <table border="1" cellpadding="8">
+    <tr>
+        <th>#</th><th>Amount</th><th>Source</th><th>Date</th><th>Note</th><th>Actions</th>
+    </tr>
     """
 
-    for r in rows:
-        html += f"{r['amount']} - {r['source']} - {r['date']}<br>"
+    for i, r in enumerate(rows, 1):
+        html += f"""
+        <tr>
+            <td>{i}</td>
+            <td>{r['amount']}</td>
+            <td>{r['source']}</td>
+            <td>{r['date']}</td>
+            <td>{r['note']}</td>
+            <td>
+                <a href="/income?delete={r['id']}">Delete</a>
+            </td>
+        </tr>
+        """
 
-    html += '<br><a href="/dashboard">Back</a>'
+    html += """
+    </table>
+    <br>
+    <a href="/income/report/pdf">Download PDF</a> |
+    <a href="/income/report/docx">Download DOC</a> |
+    <a href="/income/report/excel">Download Excel</a>
+    <br><br>
+    <a href="/dashboard">Back</a>
+    """
     return html
+@app.route('/income/report/pdf')
+def income_pdf():
+    if 'user_id' not in session:
+        return redirect('/login')
 
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM income WHERE user_id=%s", (session['user_id'],))
+    rows = cur.fetchall()
+
+    file = "income_report.pdf"
+    doc = SimpleDocTemplate(file)
+    styles = getSampleStyleSheet()
+
+    content = "INCOME REPORT\n\n"
+    for r in rows:
+        content += f"{r['amount']} - {r['source']} - {r['date']}\n"
+
+    doc.build([Paragraph(content, styles['Normal'])])
+    return send_file(file, as_attachment=True)
+
+
+@app.route('/income/report/docx')
+def income_docx():
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM income WHERE user_id=%s", (session['user_id'],))
+    rows = cur.fetchall()
+
+    file = "income_report.docx"
+    doc = Document()
+    doc.add_heading("Income Report", 0)
+
+    for r in rows:
+        doc.add_paragraph(f"{r['amount']} - {r['source']} - {r['date']}")
+
+    doc.save(file)
+    return send_file(file, as_attachment=True)
+
+
+@app.route('/income/report/excel')
+def income_excel():
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM income WHERE user_id=%s", (session['user_id'],))
+    rows = cur.fetchall()
+
+    file = "income_report.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Amount", "Source", "Date", "Note"])
+
+    for r in rows:
+        ws.append([r['amount'], r['source'], r['date'], r['note']])
+
+    wb.save(file)
+    return send_file(file, as_attachment=True)
 
 # ================= EXPENSES =================
 @app.route('/expenses', methods=['GET','POST'])
@@ -177,7 +278,16 @@ def expenses():
 
     db = get_db()
     cur = db.cursor()
+    user_id = session['user_id']
 
+    # ===== DELETE =====
+    delete_id = request.args.get('delete')
+    if delete_id:
+        cur.execute("DELETE FROM expenses WHERE id=%s AND user_id=%s", (delete_id, user_id))
+        db.commit()
+        return redirect('/expenses')
+
+    # ===== ADD =====
     if request.method == 'POST':
         cur.execute("""
         INSERT INTO expenses(amount,category,date,note,user_id)
@@ -187,32 +297,119 @@ def expenses():
             request.form['category'],
             request.form['date'],
             request.form['note'],
-            session['user_id']
+            user_id
         ))
         db.commit()
 
-    cur.execute("SELECT * FROM expenses WHERE user_id=%s ORDER BY id DESC", (session['user_id'],))
+    # ===== FETCH =====
+    cur.execute("SELECT * FROM expenses WHERE user_id=%s ORDER BY id DESC", (user_id,))
     rows = cur.fetchall()
 
-    html = """
-    <h3>Add Expense</h3>
+    total = sum(float(r['amount']) for r in rows)
+
+    # ===== HTML =====
+    html = f"""
+    <h2>Add Expense</h2>
     <form method="POST">
     Amount:<input name="amount"><br>
     Category:<input name="category"><br>
     Date:<input type="date" name="date"><br>
     Note:<input name="note"><br>
     <button>Save</button>
-    </form><hr>
-    <h3>All Expenses</h3>
+    </form>
+
+    <h3>Total Expenses: {total}</h3>
+
+    <table border="1" cellpadding="8">
+    <tr>
+        <th>#</th><th>Amount</th><th>Category</th><th>Date</th><th>Note</th><th>Actions</th>
+    </tr>
     """
 
-    for r in rows:
-        html += f"{r['amount']} - {r['category']} - {r['date']}<br>"
+    for i, r in enumerate(rows, 1):
+        html += f"""
+        <tr>
+            <td>{i}</td>
+            <td>{r['amount']}</td>
+            <td>{r['category']}</td>
+            <td>{r['date']}</td>
+            <td>{r['note']}</td>
+            <td>
+                <a href="/expenses?delete={r['id']}">Delete</a>
+            </td>
+        </tr>
+        """
 
-    html += '<br><a href="/dashboard">Back</a>'
+    html += """
+    </table>
+    <br>
+    <a href="/expenses/report/pdf">Download PDF</a> |
+    <a href="/expenses/report/docx">Download DOC</a> |
+    <a href="/expenses/report/excel">Download Excel</a>
+    <br><br>
+    <a href="/dashboard">Back</a>
+    """
     return html
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from openpyxl import Workbook
+from docx import Document
 
 
+@app.route('/expenses/report/pdf')
+def expenses_pdf():
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM expenses WHERE user_id=%s", (session['user_id'],))
+    rows = cur.fetchall()
+
+    file = "expenses_report.pdf"
+    doc = SimpleDocTemplate(file)
+    styles = getSampleStyleSheet()
+
+    content = "EXPENSE REPORT\n\n"
+    for r in rows:
+        content += f"{r['amount']} - {r['category']} - {r['date']}\n"
+
+    doc.build([Paragraph(content, styles['Normal'])])
+    return send_file(file, as_attachment=True)
+
+
+@app.route('/expenses/report/docx')
+def expenses_docx():
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM expenses WHERE user_id=%s", (session['user_id'],))
+    rows = cur.fetchall()
+
+    file = "expenses_report.docx"
+    doc = Document()
+    doc.add_heading("Expenses Report", 0)
+
+    for r in rows:
+        doc.add_paragraph(f"{r['amount']} - {r['category']} - {r['date']}")
+
+    doc.save(file)
+    return send_file(file, as_attachment=True)
+
+
+@app.route('/expenses/report/excel')
+def expenses_excel():
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM expenses WHERE user_id=%s", (session['user_id'],))
+    rows = cur.fetchall()
+
+    file = "expenses_report.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Amount", "Category", "Date", "Note"])
+
+    for r in rows:
+        ws.append([r['amount'], r['category'], r['date'], r['note']])
+
+    wb.save(file)
+    return send_file(file, as_attachment=True)
 # ================= ACTIVITIES =================
 @app.route('/activities', methods=['GET','POST'])
 def activities():
