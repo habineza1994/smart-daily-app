@@ -5,4 +5,5 @@ werkzeug
 pymysql
 reportlab
 pyjwt
-Flask-MySQLdb
+python-docx
+openpyxl
