@@ -133,36 +133,113 @@ from openpyxl import Workbook
 from docx import Document
 
 
-@app.route('/income', methods=['GET','POST'])
+
+
+@app.route('/income', methods=['GET', 'POST'])
 def income():
     if 'user_id' not in session:
         return redirect('/login')
 
-    db = get_db()
-    cur = db.cursor()
     user_id = session['user_id']
+    cur = db.cursor(dictionary=True)
 
-    # ===== DELETE =====
+    # DELETE (soft)
     delete_id = request.args.get('delete')
     if delete_id:
-        cur.execute("DELETE FROM income WHERE id=%s AND user_id=%s", (delete_id, user_id))
+        cur.execute("""
+            UPDATE income
+            SET deleted_at=NOW()
+            WHERE id=%s AND user_id=%s
+        """, (delete_id, user_id))
         db.commit()
         return redirect('/income')
 
-    # ===== ADD =====
-    if request.method == 'POST':
+    # EDIT LOAD
+    edit_id = request.args.get('edit')
+    edit_row = None
+    if edit_id:
+        cur.execute("SELECT * FROM income WHERE id=%s", (edit_id,))
+        edit_row = cur.fetchone()
+
+    # UPDATE
+    if edit_id and request.method == 'POST':
         cur.execute("""
-        INSERT INTO income(amount,source,date,note,user_id)
-        VALUES(%s,%s,%s,%s,%s)
+            UPDATE income
+            SET amount=%s, source=%s, date=%s, note=%s,
+                updated_at=NOW()
+            WHERE id=%s AND user_id=%s
         """, (
             request.form['amount'],
             request.form['source'],
             request.form['date'],
             request.form['note'],
+            edit_id,
             user_id
         ))
         db.commit()
+        return redirect('/income')
 
+    # INSERT
+    if request.method == 'POST':
+        cur.execute("""
+            INSERT INTO income(amount,source,date,note,user_id,user,created_at)
+            VALUES(%s,%s,%s,%s,%s,%s,NOW())
+        """, (
+            request.form['amount'],
+            request.form['source'],
+            request.form['date'],
+            request.form['note'],
+            user_id,
+            "user_"+str(user_id)
+        ))
+        db.commit()
+        return redirect('/income')
+
+    # SELECT (no deleted)
+    cur.execute("""
+        SELECT * FROM income
+        WHERE user_id=%s AND deleted_at IS NULL
+        ORDER BY id DESC
+    """, (user_id,))
+    rows = cur.fetchall()
+
+    table = ""
+    for r in rows:
+        table += f"""
+        <tr>
+            <td>{r['amount']}</td>
+            <td>{r['source']}</td>
+            <td>{r['date']}</td>
+            <td>{r['note']}</td>
+            <td>
+                <a href="/income?edit={r['id']}">Edit</a> |
+                <a href="/income?delete={r['id']}">Delete</a>
+            </td>
+        </tr>
+        """
+
+    return f"""
+    <h2>Income</h2>
+
+    <form method="POST">
+        Amount: <input name="amount" value="{edit_row['amount'] if edit_row else ''}"><br>
+        Source: <input name="source" value="{edit_row['source'] if edit_row else ''}"><br>
+        Date: <input type="date" name="date" value="{edit_row['date'] if edit_row else ''}"><br>
+        Note: <input name="note" value="{edit_row['note'] if edit_row else ''}"><br>
+        <button type="submit">Save</button>
+    </form>
+
+    <table border="1">
+        <tr>
+            <th>Amount</th>
+            <th>Source</th>
+            <th>Date</th>
+            <th>Note</th>
+            <th>Action</th>
+        </tr>
+        {table}
+    </table>
+    """
     # ===== FETCH =====
     cur.execute("SELECT * FROM income WHERE user_id=%s ORDER BY id DESC", (user_id,))
     rows = cur.fetchall()
@@ -271,36 +348,107 @@ def income_excel():
     return send_file(file, as_attachment=True)
 
 # ================= EXPENSES =================
-@app.route('/expenses', methods=['GET','POST'])
+
+@app.route('/expenses', methods=['GET', 'POST'])
 def expenses():
     if 'user_id' not in session:
         return redirect('/login')
 
-    db = get_db()
-    cur = db.cursor()
     user_id = session['user_id']
+    cur = db.cursor(dictionary=True)
 
-    # ===== DELETE =====
     delete_id = request.args.get('delete')
     if delete_id:
-        cur.execute("DELETE FROM expenses WHERE id=%s AND user_id=%s", (delete_id, user_id))
+        cur.execute("""
+            UPDATE expenses
+            SET deleted_at=NOW()
+            WHERE id=%s AND user_id=%s
+        """, (delete_id, user_id))
         db.commit()
         return redirect('/expenses')
 
-    # ===== ADD =====
-    if request.method == 'POST':
+    edit_id = request.args.get('edit')
+    edit_row = None
+    if edit_id:
+        cur.execute("SELECT * FROM expenses WHERE id=%s", (edit_id,))
+        edit_row = cur.fetchone()
+
+    if edit_id and request.method == 'POST':
         cur.execute("""
-        INSERT INTO expenses(amount,category,date,note,user_id)
-        VALUES(%s,%s,%s,%s,%s)
+            UPDATE expenses
+            SET amount=%s, category=%s, date=%s, note=%s,
+                updated_at=NOW()
+            WHERE id=%s AND user_id=%s
         """, (
             request.form['amount'],
             request.form['category'],
             request.form['date'],
             request.form['note'],
+            edit_id,
             user_id
         ))
         db.commit()
+        return redirect('/expenses')
 
+    if request.method == 'POST':
+        cur.execute("""
+            INSERT INTO expenses(amount,category,date,note,user_id,user,created_at)
+            VALUES(%s,%s,%s,%s,%s,%s,NOW())
+        """, (
+            request.form['amount'],
+            request.form['category'],
+            request.form['date'],
+            request.form['note'],
+            user_id,
+            "user_"+str(user_id)
+        ))
+        db.commit()
+        return redirect('/expenses')
+
+    cur.execute("""
+        SELECT * FROM expenses
+        WHERE user_id=%s AND deleted_at IS NULL
+        ORDER BY id DESC
+    """, (user_id,))
+    rows = cur.fetchall()
+
+    table = ""
+    for r in rows:
+        table += f"""
+        <tr>
+            <td>{r['amount']}</td>
+            <td>{r['category']}</td>
+            <td>{r['date']}</td>
+            <td>{r['note']}</td>
+            <td>
+                <a href="/expenses?edit={r['id']}">Edit</a> |
+                <a href="/expenses?delete={r['id']}">Delete</a>
+            </td>
+        </tr>
+        """
+
+    return f"""
+    <h2>Expenses</h2>
+
+    <form method="POST">
+        Amount: <input name="amount" value="{edit_row['amount'] if edit_row else ''}"><br>
+        Category: <input name="category" value="{edit_row['category'] if edit_row else ''}"><br>
+        Date: <input type="date" name="date" value="{edit_row['date'] if edit_row else ''}"><br>
+        Note: <input name="note" value="{edit_row['note'] if edit_row else ''}"><br>
+        <button type="submit">Save</button>
+    </form>
+
+    <table border="1">
+        <tr>
+            <th>Amount</th>
+            <th>Category</th>
+            <th>Date</th>
+            <th>Note</th>
+            <th>Action</th>
+        </tr>
+        {table}
+    </table>
+    """
     # ===== FETCH =====
     cur.execute("SELECT * FROM expenses WHERE user_id=%s ORDER BY id DESC", (user_id,))
     rows = cur.fetchall()
