@@ -1,17 +1,13 @@
 import os
-import jwt
 import datetime
-import config
 import pymysql
-
-from flask import Flask, request, jsonify, send_file
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, request, redirect, session, send_file
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = config.SECRET_KEY
+app.secret_key = "hirwa_secret_key"
 
 
-# ===== MySQL connection using pymysql =====
+# ================= DB =================
 def get_db():
     return pymysql.connect(
         host=os.environ.get('MYSQLHOST'),
@@ -20,374 +16,246 @@ def get_db():
         database=os.environ.get('MYSQLDATABASE'),
         cursorclass=pymysql.cursors.DictCursor
     )
+
+
+# ================= INIT DB =================
 @app.route("/initdb")
 def init_db():
-    conn = get_db()
-    cur = conn.cursor()
+    db = get_db()
+    cur = db.cursor()
 
-    # USERS
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
+    cur.execute("""CREATE TABLE IF NOT EXISTS users(
         id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(100) NOT NULL,
-        password VARCHAR(255) NOT NULL
-    )
-    """)
+        username VARCHAR(100),
+        password VARCHAR(255)
+    )""")
 
-    # INCOME
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS income (
+    cur.execute("""CREATE TABLE IF NOT EXISTS income(
         id INT AUTO_INCREMENT PRIMARY KEY,
         amount DECIMAL(10,2),
         source VARCHAR(255),
         date DATE,
         note TEXT,
         user_id INT
-    )
-    """)
+    )""")
 
-    # EXPENSES
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS expenses (
+    cur.execute("""CREATE TABLE IF NOT EXISTS expenses(
         id INT AUTO_INCREMENT PRIMARY KEY,
         amount DECIMAL(10,2),
         category VARCHAR(255),
         date DATE,
         note TEXT,
         user_id INT
-    )
-    """)
+    )""")
 
-    # ACTIVITIES
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS activities (
+    cur.execute("""CREATE TABLE IF NOT EXISTS activities(
         id INT AUTO_INCREMENT PRIMARY KEY,
         activity_name VARCHAR(255),
         done_by VARCHAR(255),
         date DATE,
         description TEXT,
         user_id INT
-    )
-    """)
+    )""")
 
-    conn.commit()
-    cur.close()
-    conn.close()
-    return "ALL TABLES CREATED"
-# ================= TEST DB =================
-@app.route("/testdb")
-def test_db():
-    import os, pymysql
-    try:
-        conn = pymysql.connect(
-            host=os.environ.get("MYSQLHOST"),
-            user=os.environ.get("MYSQLUSER"),
-            password=os.environ.get("MYSQLPASSWORD"),
-            database=os.environ.get("MYSQLDATABASE"),
-            port=int(os.environ.get("MYSQLPORT", 3306))
-        )
-        conn.close()
-        return "DB OK"
-    except Exception as e:
-        return f"DB ERROR: {e}"
-# ================= HOME =================
-@app.route("/")
-def home():
-    return "HIRWA SMART DAILY APP IS WORKING ✅"
-
-
-# ================= TOKEN HELPER =================
-def get_user_id():
-    token = request.headers.get('Authorization')
-    if not token:
-        return None
-    try:
-        data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return data['user_id']
-    except:
-        return None
+    db.commit()
+    return "DB READY"
 
 
 # ================= AUTH =================
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET','POST'])
 def register():
-    db = get_db()
-    cur = db.cursor()
-
     if request.method == 'POST':
-        # niba ari JSON (API)
-        if request.is_json:
-            data = request.get_json()
-            username = data['username']
-            password = generate_password_hash(data['password'])
-        else:
-            # niba ari Form (WebIntoApp / Browser)
-            username = request.form['username']
-            password = generate_password_hash(request.form['password'])
-
+        db = get_db()
+        cur = db.cursor()
         cur.execute(
-            "INSERT INTO users(username, password) VALUES (%s, %s)",
-            (username, password)
+            "INSERT INTO users(username,password) VALUES(%s,%s)",
+            (request.form['username'], request.form['password'])
         )
         db.commit()
+        return redirect('/login')
 
-        return "User created successfully!"
-
-    # GET → Erekana form
     return """
-    <h2>Register - HIRWA SMART</h2>
+    <h2>Register</h2>
     <form method="POST">
-        Username: <input name="username"><br><br>
-        Password: <input name="password" type="password"><br><br>
-        <button type="submit">Register</button>
+    Username:<input name="username"><br>
+    Password:<input name="password"><br>
+    <button>Register</button>
     </form>
     """
-from flask import redirect
 
-@app.route('/login', methods=['GET', 'POST'])
+
+@app.route('/login', methods=['GET','POST'])
 def login():
-    db = get_db()
-    cur = db.cursor()
-
     if request.method == 'POST':
-        if request.is_json:
-            data = request.get_json()
-            username = data['username']
-            password = data['password']
-        else:
-            username = request.form['username']
-            password = request.form['password']
-
+        db = get_db()
+        cur = db.cursor()
         cur.execute(
-            "SELECT id, password FROM users WHERE username=%s",
-            (username,)
+            "SELECT * FROM users WHERE username=%s AND password=%s",
+            (request.form['username'], request.form['password'])
         )
         user = cur.fetchone()
 
-        if user and check_password_hash(user['password'], password):
-            token = jwt.encode({
-                'user_id': user['id'],
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
-            }, app.config['SECRET_KEY'], algorithm="HS256")
-
-            # aha ni ho redirect ijya
+        if user:
+            session['user_id'] = user['id']
             return redirect('/dashboard')
 
-        return "Login failed ❌"
+        return "Login Failed"
 
     return """
-    <h2>Login - HIRWA SMART</h2>
+    <h2>Login</h2>
     <form method="POST">
-        Username: <input name="username"><br><br>
-        Password: <input name="password" type="password"><br><br>
-        <button type="submit">Login</button>
+    Username:<input name="username"><br>
+    Password:<input name="password"><br>
+    <button>Login</button>
     </form>
     """
+
+
+# ================= DASHBOARD =================
 @app.route('/dashboard')
 def dashboard():
+    if 'user_id' not in session:
+        return redirect('/login')
+
     return """
     <h2>HIRWA SMART Dashboard</h2>
-    <ul>
-        <li><a href="/income-page">Manage Income</a></li>
-        <li><a href="/expenses-page">Manage Expenses</a></li>
-        <li><a href="/activities-page">Manage Activities</a></li>
-        <li><a href="/report-page">Download Report</a></li>
-    </ul>
+    <a href="/income">Income</a><br>
+    <a href="/expenses">Expenses</a><br>
+    <a href="/activities">Activities</a><br>
     """
-@app.route('/income-page')
-def income_page():
-    return """
-    <h3>Add Income</h3>
-    <form action="/income" method="post">
-        Amount: <input name="amount"><br>
-        Source: <input name="source"><br>
-        Date: <input name="date" type="date"><br>
-        Note: <input name="note"><br>
-        <button type="submit">Save</button>
-    </form>
-    <br>
-    <a href="/dashboard">Back</a>
-    """
-@app.route('/expenses-page')
-def expenses_page():
-    return """
-    <h3>Add Expense</h3>
-    <form action="/expenses" method="post">
-        Amount: <input name="amount"><br>
-        Category: <input name="category"><br>
-        Date: <input name="date" type="date"><br>
-        Note: <input name="note"><br>
-        <button type="submit">Save</button>
-    </form>
-    <br>
-    <a href="/dashboard">Back</a>
-    """
-@app.route('/activities-page')
-def activities_page():
-    return """
-    <h3>Add Activity</h3>
-    <form action="/activities" method="post">
-        Activity Name: <input name="activity_name"><br>
-        Done By: <input name="done_by"><br>
-        Date: <input name="date" type="date"><br>
-        Description: <input name="description"><br>
-        <button type="submit">Save</button>
-    </form>
-    <br>
-    <a href="/dashboard">Back</a>
-    """
-@app.route('/report-page')
-def report_page():
-    return """
-    <h3>Finance Report</h3>
-    <a href="/report">Download PDF Report</a><br><br>
-    <a href="/dashboard">Back</a>
-    """
-@app.route('/users', methods=['GET'])
-def get_users():
-    token = request.headers.get('Authorization')
 
-    if not token:
-        return jsonify({"message": "Token is missing"}), 401
 
-    try:
-        token = token.split(" ")[1]
-        jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, username FROM users")
-        users = cursor.fetchall()
-        conn.close()
-
-        return jsonify(users)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 401
 # ================= INCOME =================
-@app.route('/income', methods=['GET', 'POST'])
+@app.route('/income', methods=['GET','POST'])
 def income():
+    if 'user_id' not in session:
+        return redirect('/login')
+
     db = get_db()
     cur = db.cursor()
 
     if request.method == 'POST':
-        amount = request.form['amount']
-        source = request.form['source']
-        date = request.form['date']
-        note = request.form['note']
-
-        cur.execute(
-            "INSERT INTO income(amount,source,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
-            (amount, source, date, note, 1)
-        )
+        cur.execute("""
+        INSERT INTO income(amount,source,date,note,user_id)
+        VALUES(%s,%s,%s,%s,%s)
+        """, (
+            request.form['amount'],
+            request.form['source'],
+            request.form['date'],
+            request.form['note'],
+            session['user_id']
+        ))
         db.commit()
-        return redirect('/income-page')
 
-    cur.execute("SELECT * FROM income")
+    cur.execute("SELECT * FROM income WHERE user_id=%s ORDER BY id DESC", (session['user_id'],))
     rows = cur.fetchall()
 
-    table = "<h3>All Income</h3>"
-    for r in rows:
-        table += f"{r['amount']} - {r['source']} - {r['date']}<br>"
+    html = """
+    <h3>Add Income</h3>
+    <form method="POST">
+    Amount:<input name="amount"><br>
+    Source:<input name="source"><br>
+    Date:<input type="date" name="date"><br>
+    Note:<input name="note"><br>
+    <button>Save</button>
+    </form><hr>
+    <h3>All Income</h3>
+    """
 
-    return table
+    for r in rows:
+        html += f"{r['amount']} - {r['source']} - {r['date']}<br>"
+
+    html += '<br><a href="/dashboard">Back</a>'
+    return html
+
 
 # ================= EXPENSES =================
-@app.route('/expenses', methods=['GET', 'POST'])
+@app.route('/expenses', methods=['GET','POST'])
 def expenses():
+    if 'user_id' not in session:
+        return redirect('/login')
+
     db = get_db()
     cur = db.cursor()
 
     if request.method == 'POST':
-        amount = request.form['amount']
-        category = request.form['category']
-        date = request.form['date']
-        note = request.form['note']
-
-        cur.execute(
-            "INSERT INTO expenses(amount,category,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
-            (amount, category, date, note, 1)
-        )
+        cur.execute("""
+        INSERT INTO expenses(amount,category,date,note,user_id)
+        VALUES(%s,%s,%s,%s,%s)
+        """, (
+            request.form['amount'],
+            request.form['category'],
+            request.form['date'],
+            request.form['note'],
+            session['user_id']
+        ))
         db.commit()
-        return redirect('/expenses-page')
 
-    cur.execute("SELECT * FROM expenses")
+    cur.execute("SELECT * FROM expenses WHERE user_id=%s ORDER BY id DESC", (session['user_id'],))
     rows = cur.fetchall()
 
-    table = "<h3>All Expenses</h3>"
-    for r in rows:
-        table += f"{r['amount']} - {r['category']} - {r['date']}<br>"
-
-    return table
-
-# ================= ACTIVITIES =================
-@app.route('/activities', methods=['GET', 'POST'])
-def activities():
-    db = get_db()
-    cur = db.cursor()
-
-    if request.method == 'POST':
-        name = request.form['activity_name']
-        done_by = request.form['done_by']
-        date = request.form['date']
-        desc = request.form['description']
-
-        cur.execute(
-            "INSERT INTO activities(activity_name,done_by,date,description,user_id) VALUES(%s,%s,%s,%s,%s)",
-            (name, done_by, date, desc, 1)
-        )
-        db.commit()
-        return redirect('/activities-page')
-
-    cur.execute("SELECT * FROM activities")
-    rows = cur.fetchall()
-
-    table = "<h3>All Activities</h3>"
-    for r in rows:
-        table += f"{r['activity_name']} - {r['date']}<br>"
-
-    return table
-
-# ================= REPORT PDF =================
-@app.route('/report', methods=['GET'])
-def report():
-    user_id = get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    db = get_db()
-    cur = db.cursor()
-
-    cur.execute("SELECT SUM(amount) AS total FROM income WHERE user_id=%s", (user_id,))
-    total_income = cur.fetchone()['total'] or 0
-
-    cur.execute("SELECT SUM(amount) AS total FROM expenses WHERE user_id=%s", (user_id,))
-    total_expense = cur.fetchone()['total'] or 0
-
-    profit = total_income - total_expense
-
-    file = f"report_{user_id}.pdf"
-    doc = SimpleDocTemplate(file)
-    styles = getSampleStyleSheet()
-
-    content = f"""
-    FINANCE REPORT
-    Date: {datetime.date.today()}
-
-    Total Income: {total_income}
-    Total Expense: {total_expense}
-    Profit: {profit}
+    html = """
+    <h3>Add Expense</h3>
+    <form method="POST">
+    Amount:<input name="amount"><br>
+    Category:<input name="category"><br>
+    Date:<input type="date" name="date"><br>
+    Note:<input name="note"><br>
+    <button>Save</button>
+    </form><hr>
+    <h3>All Expenses</h3>
     """
 
-    doc.build([Paragraph(content, styles['Normal'])])
+    for r in rows:
+        html += f"{r['amount']} - {r['category']} - {r['date']}<br>"
 
-    return send_file(file, as_attachment=True)
+    html += '<br><a href="/dashboard">Back</a>'
+    return html
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    return f"SERVER ERROR:\n{e}", 500
-# ================= RUN =================
-import os
+
+# ================= ACTIVITIES =================
+@app.route('/activities', methods=['GET','POST'])
+def activities():
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    db = get_db()
+    cur = db.cursor()
+
+    if request.method == 'POST':
+        cur.execute("""
+        INSERT INTO activities(activity_name,done_by,date,description,user_id)
+        VALUES(%s,%s,%s,%s,%s)
+        """, (
+            request.form['activity_name'],
+            request.form['done_by'],
+            request.form['date'],
+            request.form['description'],
+            session['user_id']
+        ))
+        db.commit()
+
+    cur.execute("SELECT * FROM activities WHERE user_id=%s ORDER BY id DESC", (session['user_id'],))
+    rows = cur.fetchall()
+
+    html = """
+    <h3>Add Activity</h3>
+    <form method="POST">
+    Activity Name:<input name="activity_name"><br>
+    Done By:<input name="done_by"><br>
+    Date:<input type="date" name="date"><br>
+    Description:<input name="description"><br>
+    <button>Save</button>
+    </form><hr>
+    <h3>All Activities</h3>
+    """
+
+    for r in rows:
+        html += f"{r['activity_name']} - {r['date']}<br>"
+
+    html += '<br><a href="/dashboard">Back</a>'
+    return html
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
