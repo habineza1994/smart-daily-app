@@ -308,12 +308,12 @@ from docx import Document
 
 
 
-
 @app.route('/income', methods=['GET', 'POST'])
 def income():
     if 'user_id' not in session:
         return redirect('/login')
 
+    db = get_db()
     user_id = session['user_id']
     cur = db.cursor(dictionary=True)
 
