@@ -1,7 +1,8 @@
 import os
 import datetime
 import pymysql
-from flask import Flask, request, redirect, session, send_file
+
+from flask import Flask, request, redirect, session
 
 app = Flask(__name__)
 app.secret_key = "hirwa_secret_key"
@@ -37,7 +38,6 @@ def init_db():
         date DATE,
         note TEXT,
         user_id INT,
-        deleted_at DATETIME DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
 
@@ -48,7 +48,6 @@ def init_db():
         date DATE,
         note TEXT,
         user_id INT,
-        deleted_at DATETIME DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
 
@@ -66,7 +65,7 @@ def init_db():
     return "DB READY"
 
 
-# ================= AUTH =================
+# ================= REGISTER =================
 @app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
@@ -89,6 +88,7 @@ def register():
     """
 
 
+# ================= LOGIN (YOUR DESIGN RESTORED) =================
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
@@ -106,13 +106,65 @@ def login():
         return "Login failed ❌"
 
     return """
-    <h2>Login</h2>
-    <form method="POST">
-        Username:<input name="username"><br>
-        Password:<input name="password"><br>
-        <button>Login</button>
-    </form>
-    """
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+    margin:0;
+    font-family: Arial;
+    background:linear-gradient(120deg,#4e54c8,#8f94fb);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.card{
+    background:white;
+    width:92%;
+    max-width:420px;
+    border-radius:20px;
+    padding:25px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.15);
+}
+
+input{
+    width:100%;
+    padding:14px;
+    margin:10px 0;
+    border-radius:10px;
+    border:1px solid #ddd;
+}
+
+button{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#4e54c8;
+    color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<h2 style="text-align:center;">HIRWA SMART</h2>
+<form method="POST">
+<input name="username" placeholder="Username">
+<input name="password" type="password" placeholder="Password">
+<button>Login</button>
+</form>
+</div>
+
+</body>
+</html>
+"""
 
 
 @app.route("/logout")
@@ -121,110 +173,137 @@ def logout():
     return redirect("/login")
 
 
-# ================= DASHBOARD (YOUR ORIGINAL UI RESTORED) =================
+# ================= DASHBOARD (YOUR ORIGINAL BACK) =================
 @app.route("/dashboard")
 def dashboard():
     if 'user_id' not in session:
         return redirect('/login')
 
+    return """
+    <h1>HIRWA SMART Dashboard</h1>
+
+    <a href="/income">💰 Income</a><br>
+    <a href="/expenses">💸 Expenses</a><br>
+    <a href="/activities">📋 Activities</a><br>
+    <a href="/logout">Logout</a>
+    """
+
+
+# ================= INCOME (FIXED) =================
+@app.route('/income', methods=['GET','POST'])
+def income():
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    db = get_db()
+    cur = db.cursor()
     user_id = session['user_id']
-    conn = get_db()
-    cur = conn.cursor()
 
-    # SUMMARY (safe addition only)
-    cur.execute("SELECT COALESCE(SUM(amount),0) total FROM income WHERE user_id=%s", (user_id,))
-    income = float(cur.fetchone()['total'])
+    if request.method == 'POST':
+        cur.execute("""
+            INSERT INTO income(amount,source,date,note,user_id)
+            VALUES(%s,%s,%s,%s,%s)
+        """, (
+            request.form['amount'],
+            request.form['source'],
+            request.form['date'],
+            request.form['note'],
+            user_id
+        ))
+        db.commit()
+        return redirect('/income')
 
-    cur.execute("SELECT COALESCE(SUM(amount),0) total FROM expenses WHERE user_id=%s", (user_id,))
-    expenses = float(cur.fetchone()['total'])
+    cur.execute("SELECT * FROM income WHERE user_id=%s", (user_id,))
+    rows = cur.fetchall()
 
-    balance = income - expenses
-
-    # activity count
-    cur.execute("SELECT COUNT(*) c FROM activities WHERE user_id=%s", (user_id,))
-    activity_count = cur.fetchone()['c']
-
-    conn.close()
+    table = "".join(
+        f"<tr><td>{r['amount']}</td><td>{r['source']}</td><td>{r['date']}</td></tr>"
+        for r in rows
+    )
 
     return f"""
-<!DOCTYPE html>
-<html>
-<head>
-<title>HIRWA SMART Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <h2>Income</h2>
 
-<style>
-body{{margin:0;font-family:Arial;background:#f4f6fb}}
+    <form method="POST">
+        Amount:<input name="amount"><br>
+        Source:<input name="source"><br>
+        Date:<input type="date" name="date"><br>
+        Note:<input name="note"><br>
+        <button>Save</button>
+    </form>
 
-.header{{
-    background:linear-gradient(90deg,#4e54c8,#8f94fb);
-    color:white;padding:20px;text-align:center;
-    font-size:22px;font-weight:bold;
-}}
+    <table border="1">
+        <tr><th>Amount</th><th>Source</th><th>Date</th></tr>
+        {table}
+    </table>
 
-.card{{
-    background:white;margin:15px;padding:18px;
-    border-radius:15px;box-shadow:0 4px 10px rgba(0,0,0,0.08);
-    display:flex;justify-content:space-between;
-}}
+    <a href="/dashboard">Back</a>
+    """
 
-.income{{border-left:8px solid #28a745}}
-.expense{{border-left:8px solid #dc3545}}
-.activity{{border-left:8px solid #007bff}}
 
-.summary{{
-    margin:15px;background:white;padding:15px;border-radius:15px;
-}}
+# ================= EXPENSES (FIXED) =================
+@app.route('/expenses', methods=['GET','POST'])
+def expenses():
+    if 'user_id' not in session:
+        return redirect('/login')
 
-.box{{width:32%;padding:12px;border-radius:10px;color:white;text-align:center}}
+    db = get_db()
+    cur = db.cursor()
+    user_id = session['user_id']
 
-.income-box{{background:#28a745}}
-.expense-box{{background:#dc3545}}
-.balance-box{{background:#007bff}}
-</style>
-</head>
+    if request.method == 'POST':
+        cur.execute("""
+            INSERT INTO expenses(amount,category,date,note,user_id)
+            VALUES(%s,%s,%s,%s,%s)
+        """, (
+            request.form['amount'],
+            request.form['category'],
+            request.form['date'],
+            request.form['note'],
+            user_id
+        ))
+        db.commit()
+        return redirect('/expenses')
 
-<body>
+    cur.execute("SELECT * FROM expenses WHERE user_id=%s", (user_id,))
+    rows = cur.fetchall()
 
-<div class="header">HIRWA SMART</div>
+    table = "".join(
+        f"<tr><td>{r['amount']}</td><td>{r['category']}</td><td>{r['date']}</td></tr>"
+        for r in rows
+    )
 
-<div class="card income" onclick="location.href='/income'">
-<h2>💰 Income</h2><span>Track income</span>
-</div>
+    return f"""
+    <h2>Expenses</h2>
 
-<div class="card expense" onclick="location.href='/expenses'">
-<h2>💸 Expenses</h2><span>Track expenses</span>
-</div>
+    <form method="POST">
+        Amount:<input name="amount"><br>
+        Category:<input name="category"><br>
+        Date:<input type="date" name="date"><br>
+        Note:<input name="note"><br>
+        <button>Save</button>
+    </form>
 
-<div class="card activity" onclick="location.href='/activities'">
-<h2>📋 Activities</h2><span>{activity_count} activities</span>
-</div>
+    <table border="1">
+        <tr><th>Amount</th><th>Category</th><th>Date</th></tr>
+        {table}
+    </table>
 
-<div class="summary">
-<h3>Summary</h3>
-<div style="display:flex;justify-content:space-between">
-<div class="box income-box">Income<br>{income}</div>
-<div class="box expense-box">Expenses<br>{expenses}</div>
-<div class="box balance-box">Balance<br>{balance}</div>
-</div>
-</div>
-
-</body>
-</html>
-"""
+    <a href="/dashboard">Back</a>
+    """
 
 
 # ================= ACTIVITIES =================
-@app.route("/activities", methods=["GET","POST"])
+@app.route('/activities', methods=['GET','POST'])
 def activities():
     if 'user_id' not in session:
         return redirect('/login')
 
+    db = get_db()
+    cur = db.cursor()
     user_id = session['user_id']
-    conn = get_db()
-    cur = conn.cursor()
 
-    if request.method == "POST":
+    if request.method == 'POST':
         cur.execute("""
             INSERT INTO activities(activity_name,done_by,date,description,user_id)
             VALUES(%s,%s,%s,%s,%s)
@@ -235,12 +314,11 @@ def activities():
             request.form['description'],
             user_id
         ))
-        conn.commit()
-        return redirect("/activities")
+        db.commit()
+        return redirect('/activities')
 
-    cur.execute("SELECT * FROM activities WHERE user_id=%s ORDER BY id DESC", (user_id,))
+    cur.execute("SELECT * FROM activities WHERE user_id=%s", (user_id,))
     rows = cur.fetchall()
-    conn.close()
 
     table = "".join(
         f"<tr><td>{r['activity_name']}</td><td>{r['date']}</td><td>{r['description']}</td></tr>"
@@ -255,10 +333,10 @@ def activities():
         Done by:<input name="done_by"><br>
         Date:<input type="date" name="date"><br>
         Description:<input name="description"><br>
-        <button>Add</button>
+        <button>Save</button>
     </form>
 
-    <table border="1" cellpadding="8">
+    <table border="1">
         <tr><th>Name</th><th>Date</th><th>Description</th></tr>
         {table}
     </table>
