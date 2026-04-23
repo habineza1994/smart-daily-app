@@ -299,7 +299,50 @@ a{ color:black; text-decoration:none; }
 </html>
 """
 
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect('/login')
 
+    conn = get_db()
+    cur = conn.cursor(pymysql.cursors.DictCursor)
+    user_id = session['user_id']
+
+    # ================= INCOME =================
+    cur.execute("""
+        SELECT COALESCE(SUM(amount),0) AS total_income
+        FROM income
+        WHERE user_id=%s AND deleted_at IS NULL
+    """, (user_id,))
+    income = cur.fetchone()['total_income']
+
+    # ================= EXPENSES =================
+    cur.execute("""
+        SELECT COALESCE(SUM(amount),0) AS total_expenses
+        FROM expenses
+        WHERE user_id=%s AND deleted_at IS NULL
+    """, (user_id,))
+    expenses = cur.fetchone()['total_expenses']
+
+    balance = float(income) - float(expenses)
+
+    conn.close()
+
+    return f"""
+    <h1>HIRWA SMART</h1>
+
+    <h2>Summary</h2>
+
+    <h3>Income: RWF {income}</h3>
+    <h3>Expenses: RWF {expenses}</h3>
+    <h3>Balance: RWF {balance}</h3>
+
+    <hr>
+
+    <a href="/income">💰 Income</a><br>
+    <a href="/expenses">💸 Expenses</a><br>
+    <a href="/activities">📋 Activities</a><br>
+    """
 # ================= INCOME =================
 # ================= INCOME (CLEAN VERSION) =================
 
