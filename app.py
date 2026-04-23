@@ -198,17 +198,8 @@ def income():
 
     cur.execute("SELECT * FROM income WHERE user_id=%s AND deleted_at IS NULL", (uid,))
     rows = cur.fetchall()
-
-    table = "".join([
-    f"""
-    <tr>
-        <td>{r['amount']}</td>
-        <td>{r['source']}</td>
-        <td>{r['date']}</td>
-        <td>{r['note']}</td>
-        <td><a href='?delete={r["id"]}'>Delete</a></td>
-    </tr>
-    """
+ table = "".join([
+    f"<tr><td>{r['amount']}</td><td>{r['category']}</td><td>{r['date']}</td></tr>"
     for r in rows
 ])
     return f"""
