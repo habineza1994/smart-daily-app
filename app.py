@@ -1,11 +1,11 @@
 import os
 import datetime
 import pymysql
+
 from flask import Flask, request, redirect, session, send_file
 
 app = Flask(__name__)
 app.secret_key = "hirwa_secret_key"
-
 
 # ================= DB =================
 def get_db():
@@ -16,7 +16,6 @@ def get_db():
         database=os.environ.get('MYSQLDATABASE'),
         cursorclass=pymysql.cursors.DictCursor
     )
-
 
 # ================= INIT DB =================
 @app.route("/initdb")
@@ -37,8 +36,8 @@ def init_db():
         date DATE,
         note TEXT,
         user_id INT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME NULL
+        deleted_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
 
     cur.execute("""CREATE TABLE IF NOT EXISTS expenses(
@@ -48,8 +47,8 @@ def init_db():
         date DATE,
         note TEXT,
         user_id INT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted_at DATETIME NULL
+        deleted_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
 
     cur.execute("""CREATE TABLE IF NOT EXISTS activities(
@@ -58,14 +57,15 @@ def init_db():
         done_by VARCHAR(255),
         date DATE,
         description TEXT,
-        user_id INT
+        user_id INT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
 
     db.commit()
     return "DB READY"
 
 
-# ================= AUTH =================
+# ================= REGISTER =================
 @app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
@@ -81,31 +81,31 @@ def register():
     return """
     <h2>Register</h2>
     <form method="POST">
-    Username:<input name="username"><br>
-    Password:<input name="password"><br>
-    <button>Register</button>
+        Username:<input name="username"><br>
+        Password:<input name="password"><br>
+        <button>Register</button>
     </form>
     """
 
 
+# ================= LOGIN (FIXED SESSION) =================
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
         db = get_db()
-        cur = db.cursor(pymysql.cursors.DictCursor)
+        cur = db.cursor()
 
-        cur.execute("""
-            SELECT * FROM users
-            WHERE username=%s AND password=%s
-        """, (request.form["username"], request.form["password"]))
-
+        cur.execute(
+            "SELECT * FROM users WHERE username=%s AND password=%s",
+            (request.form['username'], request.form['password'])
+        )
         user = cur.fetchone()
 
         if user:
             session['user_id'] = user['id']
             return redirect("/dashboard")
-
-        return "Login failed ❌"
+        else:
+            return "Login failed ❌"
 
     return """
     <h2>Login</h2>
@@ -123,192 +123,175 @@ def logout():
     return redirect("/login")
 
 
-# ================= DASHBOARD (ONE CLEAN VERSION) =================
+# ================= DASHBOARD (ONE CLEAN VERSION ONLY) =================
 @app.route("/dashboard")
 def dashboard():
     if 'user_id' not in session:
         return redirect('/login')
 
+    user_id = session['user_id']
     filter_type = request.args.get('filter', 'all')
 
     conn = get_db()
-    cur = conn.cursor(pymysql.cursors.DictCursor)
-    user_id = session['user_id']
+    cur = conn.cursor()
 
-    # ================= FILTERS =================
     income_filter = ""
     expense_filter = ""
 
     if filter_type == "today":
         income_filter = "AND DATE(created_at)=CURDATE()"
         expense_filter = "AND DATE(created_at)=CURDATE()"
-
     elif filter_type == "month":
         income_filter = "AND MONTH(created_at)=MONTH(CURDATE())"
         expense_filter = "AND MONTH(created_at)=MONTH(CURDATE())"
 
     # ================= SUMMARY =================
     cur.execute(f"""
-        SELECT COALESCE(SUM(amount),0) AS total_income
-        FROM income
+        SELECT COALESCE(SUM(amount),0) total FROM income
         WHERE user_id=%s AND deleted_at IS NULL {income_filter}
     """, (user_id,))
-    income = float(cur.fetchone()['total_income'])
+    income = float(cur.fetchone()['total'])
 
     cur.execute(f"""
-        SELECT COALESCE(SUM(amount),0) AS total_expenses
-        FROM expenses
+        SELECT COALESCE(SUM(amount),0) total FROM expenses
         WHERE user_id=%s AND deleted_at IS NULL {expense_filter}
     """, (user_id,))
-    expenses = float(cur.fetchone()['total_expenses'])
+    expenses = float(cur.fetchone()['total'])
 
     balance = income - expenses
 
-    # ================= RECENT TRANSACTIONS =================
+    # ================= RECENT =================
     cur.execute("""
-        SELECT 'Income' AS type, amount, created_at
-        FROM income
+        SELECT 'Income' type, amount, created_at FROM income
         WHERE user_id=%s AND deleted_at IS NULL
-
         UNION ALL
-
-        SELECT 'Expense' AS type, amount, created_at
-        FROM expenses
+        SELECT 'Expense', amount, created_at FROM expenses
         WHERE user_id=%s AND deleted_at IS NULL
-
-        ORDER BY created_at DESC
-        LIMIT 10
+        ORDER BY created_at DESC LIMIT 10
     """, (user_id, user_id))
 
     transactions = cur.fetchall()
 
-    # ================= MONTHLY DATA =================
-    cur.execute("""
-        SELECT DATE_FORMAT(created_at,'%%Y-%%m') AS month,
-               SUM(amount) AS total
-        FROM income
-        WHERE user_id=%s AND deleted_at IS NULL
-        GROUP BY month
-    """, (user_id,))
-    income_months = cur.fetchall()
-
-    cur.execute("""
-        SELECT DATE_FORMAT(created_at,'%%Y-%%m') AS month,
-               SUM(amount) AS total
-        FROM expenses
-        WHERE user_id=%s AND deleted_at IS NULL
-        GROUP BY month
-    """, (user_id,))
-    expense_months = cur.fetchall()
+    # ================= ACTIVITY COUNT =================
+    cur.execute("SELECT COUNT(*) c FROM activities WHERE user_id=%s", (user_id,))
+    activity_count = cur.fetchone()['c']
 
     conn.close()
 
-    # ================= PREPARE CHART DATA =================
-    months = list(set(
-        [m['month'] for m in income_months] +
-        [m['month'] for m in expense_months]
-    ))
-    months.sort()
-
-    income_values = []
-    expense_values = []
-
-    for m in months:
-        inc = next((x['total'] for x in income_months if x['month'] == m), 0)
-        exp = next((x['total'] for x in expense_months if x['month'] == m), 0)
-
-        income_values.append(float(inc))
-        expense_values.append(float(exp))
-
-    # ================= NOTIFICATION =================
+    notification = """
+    <div style='padding:10px;background:#28a745;color:white;border-radius:8px;'>
+    System OK ✅
+    </div>
+    """
     if balance < 0:
-        notification = "<div style='background:red;color:white;padding:10px;'>⚠ Negative Balance</div>"
-    else:
-        notification = "<div style='background:green;color:white;padding:10px;'>✅ System OK</div>"
+        notification = """
+        <div style='padding:10px;background:red;color:white;border-radius:8px;'>
+        ⚠ Negative Balance Warning!
+        </div>
+        """
 
-    # ================= HTML =================
+    rows_html = ""
+    for t in transactions:
+        rows_html += f"<tr><td>{t['type']}</td><td>{t['amount']}</td><td>{t['created_at']}</td></tr>"
+
     return f"""
     <html>
     <head>
-        <title>HIRWA SMART</title>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>HIRWA SMART</title>
     </head>
 
-    <body style="font-family:Arial;background:#f5f5f5;padding:20px;">
+    <body style="font-family:Arial;background:#f4f6fb;padding:20px;">
 
-        <h1>🔥 HIRWA SMART Dashboard</h1>
+    <h1>🔥 HIRWA SMART</h1>
 
-        {notification}
+    {notification}
 
-        <form method="GET">
-            <select name="filter">
-                <option value="all">All</option>
-                <option value="today">Today</option>
-                <option value="month">This Month</option>
-            </select>
-            <button>Filter</button>
-        </form>
+    <h3>Summary</h3>
+    <p>💰 Income: {income}</p>
+    <p>💸 Expenses: {expenses}</p>
+    <p>📊 Balance: {balance}</p>
+    <p>📋 Activities: {activity_count}</p>
 
-        <h3>Income: {income}</h3>
-        <h3>Expenses: {expenses}</h3>
-        <h3>Balance: {balance}</h3>
+    <hr>
 
-        <hr>
+    <form method="GET">
+        <select name="filter">
+            <option value="all">All</option>
+            <option value="today">Today</option>
+            <option value="month">This Month</option>
+        </select>
+        <button>Filter</button>
+    </form>
 
-        <h2>Recent Transactions</h2>
-        <table border="1" cellpadding="6">
-            <tr><th>Type</th><th>Amount</th><th>Date</th></tr>
-            {"".join([f"<tr><td>{t['type']}</td><td>{t['amount']}</td><td>{t['created_at']}</td></tr>" for t in transactions])}
-        </table>
+    <h3>Recent Transactions</h3>
+    <table border="1" cellpadding="8">
+        <tr><th>Type</th><th>Amount</th><th>Date</th></tr>
+        {rows_html}
+    </table>
 
-        <hr>
+    <hr>
 
-        <h2>Charts</h2>
-        <canvas id="chart1"></canvas>
-
-        <script>
-        new Chart(document.getElementById('chart1'), {{
-            type: 'bar',
-            data: {{
-                labels: {months},
-                datasets: [
-                    {{
-                        label: 'Income',
-                        data: {income_values},
-                        backgroundColor: 'green'
-                    }},
-                    {{
-                        label: 'Expenses',
-                        data: {expense_values},
-                        backgroundColor: 'red'
-                    }}
-                ]
-            }}
-        }});
-        </script>
-
-        <br>
-        <a href="/income">Income</a> |
-        <a href="/expenses">Expenses</a> |
-        <a href="/logout">Logout</a>
+    <a href="/income">Income</a> |
+    <a href="/expenses">Expenses</a> |
+    <a href="/activities">Activities</a> |
+    <a href="/logout">Logout</a>
 
     </body>
     </html>
     """
 
 
-# ================= PLACEHOLDERS =================
-@app.route('/income')
-def income():
-    return "Income page"
-
-@app.route('/expenses')
-def expenses():
-    return "Expenses page"
-
-@app.route('/activities')
+# ================= ACTIVITIES (NEW) =================
+@app.route("/activities", methods=["GET","POST"])
 def activities():
-    return "Activities page"
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+    conn = get_db()
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        cur.execute("""
+            INSERT INTO activities(activity_name,done_by,date,description,user_id)
+            VALUES(%s,%s,%s,%s,%s)
+        """, (
+            request.form['activity_name'],
+            request.form['done_by'],
+            request.form['date'],
+            request.form['description'],
+            user_id
+        ))
+        conn.commit()
+        return redirect("/activities")
+
+    cur.execute("SELECT * FROM activities WHERE user_id=%s ORDER BY id DESC", (user_id,))
+    rows = cur.fetchall()
+    conn.close()
+
+    table = ""
+    for r in rows:
+        table += f"<tr><td>{r['activity_name']}</td><td>{r['date']}</td><td>{r['description']}</td></tr>"
+
+    return f"""
+    <h2>Activities</h2>
+
+    <form method="POST">
+        Name:<input name="activity_name"><br>
+        Done by:<input name="done_by"><br>
+        Date:<input type="date" name="date"><br>
+        Description:<input name="description"><br>
+        <button>Add</button>
+    </form>
+
+    <table border="1" cellpadding="8">
+        <tr><th>Name</th><th>Date</th><th>Description</th></tr>
+        {table}
+    </table>
+
+    <br>
+    <a href="/dashboard">Back</a>
+    """
 
 
 if __name__ == "__main__":
