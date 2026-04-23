@@ -301,30 +301,41 @@ a{ color:black; text-decoration:none; }
 
 
 # ================= INCOME =================
+# ================= INCOME (CLEAN VERSION) =================
+
 @app.route('/income', methods=['GET', 'POST'])
-def income_page():
+def income():
     if 'user_id' not in session:
         return redirect('/login')
 
-    db = get_db()
-    cur = db.cursor()
+    conn = get_db()
+    cur = conn.cursor(pymysql.cursors.DictCursor)
     user_id = session['user_id']
 
-    # DELETE
+    # ================= DELETE =================
     delete_id = request.args.get('delete')
     if delete_id:
-        cur.execute("UPDATE income SET deleted_at=NOW() WHERE id=%s AND user_id=%s", (delete_id, user_id))
-        db.commit()
+        cur.execute("""
+            UPDATE income
+            SET deleted_at=NOW()
+            WHERE id=%s AND user_id=%s
+        """, (delete_id, user_id))
+        conn.commit()
+        conn.close()
         return redirect('/income')
 
-    # EDIT LOAD
+    # ================= EDIT LOAD =================
     edit_id = request.args.get('edit')
     edit_row = None
+
     if edit_id:
-        cur.execute("SELECT * FROM income WHERE id=%s AND user_id=%s", (edit_id, user_id))
+        cur.execute("""
+            SELECT * FROM income
+            WHERE id=%s AND user_id=%s
+        """, (edit_id, user_id))
         edit_row = cur.fetchone()
 
-    # UPDATE
+    # ================= UPDATE =================
     if edit_id and request.method == 'POST':
         cur.execute("""
             UPDATE income
@@ -338,13 +349,14 @@ def income_page():
             edit_id,
             user_id
         ))
-        db.commit()
+        conn.commit()
+        conn.close()
         return redirect('/income')
 
-    # INSERT
+    # ================= INSERT =================
     if request.method == 'POST' and not edit_id:
         cur.execute("""
-            INSERT INTO income(amount,source,date,note,user_id,user,created_at)
+            INSERT INTO income(amount, source, date, note, user_id, user, created_at)
             VALUES(%s,%s,%s,%s,%s,%s,NOW())
         """, (
             request.form['amount'],
@@ -354,10 +366,11 @@ def income_page():
             user_id,
             "user_" + str(user_id)
         ))
-        db.commit()
+        conn.commit()
+        conn.close()
         return redirect('/income')
 
-    # SELECT
+    # ================= FETCH =================
     cur.execute("""
         SELECT * FROM income
         WHERE user_id=%s AND deleted_at IS NULL
@@ -365,125 +378,58 @@ def income_page():
     """, (user_id,))
     rows = cur.fetchall()
 
-    total = sum(float(r[1]) for r in rows) if rows else 0
+    conn.close()
 
+    total = sum(float(r['amount']) for r in rows) if rows else 0
+
+    # ================= TABLE =================
     table = ""
     for r in rows:
         table += f"""
         <tr>
-            <td>{r[1]}</td>
-            <td>{r[2]}</td>
-            <td>{r[3]}</td>
-            <td>{r[4]}</td>
+            <td>{r['amount']}</td>
+            <td>{r['source']}</td>
+            <td>{r['date']}</td>
+            <td>{r['note']}</td>
             <td>
-                <a href="/income?edit={r[0]}">Edit</a> |
-                <a href="/income?delete={r[0]}">Delete</a>
+                <a href="/income?edit={r['id']}">Edit</a> |
+                <a href="/income?delete={r['id']}">Delete</a>
             </td>
         </tr>
         """
 
-    html = f"""
+    # ================= HTML =================
+    return f"""
     <h2>Income</h2>
 
     <form method="POST">
-        Amount: <input name="amount" value="{edit_row[1] if edit_row else ''}"><br>
-        Source: <input name="source" value="{edit_row[2] if edit_row else ''}"><br>
-        Date: <input type="date" name="date" value="{edit_row[3] if edit_row else ''}"><br>
-        Note: <input name="note" value="{edit_row[4] if edit_row else ''}"><br>
+        Amount: <input name="amount" value="{edit_row['amount'] if edit_row else ''}"><br>
+        Source: <input name="source" value="{edit_row['source'] if edit_row else ''}"><br>
+        Date: <input type="date" name="date" value="{edit_row['date'] if edit_row else ''}"><br>
+        Note: <input name="note" value="{edit_row['note'] if edit_row else ''}"><br>
         <button type="submit">Save</button>
     </form>
 
     <h3>Total Income: {total}</h3>
 
-    <table border="1">
+    <table border="1" cellpadding="8">
         <tr>
-            <th>Amount</th><th>Source</th><th>Date</th><th>Note</th><th>Action</th>
+            <th>Amount</th>
+            <th>Source</th>
+            <th>Date</th>
+            <th>Note</th>
+            <th>Actions</th>
         </tr>
         {table}
     </table>
 
     <br>
     <a href="/income/report/pdf">PDF</a> |
-    <a href="/income/report/docx">DOC</a> |
-    <a href="/income/report/excel">Excel</a>
+    <a href="/income/report/docx">DOCX</a> |
+    <a href="/income/report/excel">EXCEL</a>
     <br><br>
     <a href="/dashboard">Back</a>
     """
-
-    cur.close()
-    db.close()
-    return html
-
-
-# ================= PDF =================
-@app.route('/income/report/pdf')
-def income_pdf_report():
-    if 'user_id' not in session:
-        return redirect('/login')
-
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM income WHERE user_id=%s", (session['user_id'],))
-    rows = cur.fetchall()
-
-    file = "income_report.pdf"
-    doc = SimpleDocTemplate(file)
-    styles = getSampleStyleSheet()
-
-    content = "INCOME REPORT\n\n"
-    for r in rows:
-        content += f"{r[1]} - {r[2]} - {r[3]}\n"
-
-    doc.build([Paragraph(content, styles['Normal'])])
-
-    cur.close()
-    db.close()
-    return send_file(file, as_attachment=True)
-
-
-# ================= DOCX =================
-@app.route('/income/report/docx')
-def income_docx():
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM income WHERE user_id=%s", (session['user_id'],))
-    rows = cur.fetchall()
-
-    file = "income_report.docx"
-    doc = Document()
-    doc.add_heading("Income Report", 0)
-
-    for r in rows:
-        doc.add_paragraph(f"{r[1]} - {r[2]} - {r[3]}")
-
-    doc.save(file)
-
-    cur.close()
-    db.close()
-    return send_file(file, as_attachment=True)
-
-
-# ================= EXCEL =================
-@app.route('/income/report/excel')
-def income_excel():
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM income WHERE user_id=%s", (session['user_id'],))
-    rows = cur.fetchall()
-
-    file = "income_report.xlsx"
-    wb = Workbook()
-    ws = wb.active
-    ws.append(["Amount", "Source", "Date", "Note"])
-
-    for r in rows:
-        ws.append([r[1], r[2], r[3], r[4]])
-
-    wb.save(file)
-
-    cur.close()
-    db.close()
-    return send_file(file, as_attachment=True)
 # ================= EXPENSES =================
 
 @app.route('/expenses', methods=['GET', 'POST'])
