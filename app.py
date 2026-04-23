@@ -2,10 +2,6 @@ import os
 import datetime
 import pymysql
 from flask import Flask, request, redirect, session, send_file
-from docx import Document
-from openpyxl import Workbook
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
 
 app = Flask(__name__)
 app.secret_key = "hirwa_secret_key"
@@ -70,13 +66,15 @@ def init_db():
 
 
 # ================= AUTH =================
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
         db = get_db()
         cur = db.cursor()
-        cur.execute("INSERT INTO users(username,password) VALUES(%s,%s)",
-                    (request.form['username'], request.form['password']))
+        cur.execute(
+            "INSERT INTO users(username,password) VALUES(%s,%s)",
+            (request.form['username'], request.form['password'])
+        )
         db.commit()
         return redirect('/login')
 
@@ -90,7 +88,7 @@ def register():
     """
 
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
         db = get_db()
@@ -125,7 +123,7 @@ def logout():
     return redirect("/login")
 
 
-# ================= DASHBOARD (ONLY ONE - FIXED) =================
+# ================= DASHBOARD (ONE CLEAN VERSION) =================
 @app.route("/dashboard")
 def dashboard():
     if 'user_id' not in session:
@@ -137,12 +135,14 @@ def dashboard():
     cur = conn.cursor(pymysql.cursors.DictCursor)
     user_id = session['user_id']
 
+    # ================= FILTERS =================
     income_filter = ""
     expense_filter = ""
 
     if filter_type == "today":
         income_filter = "AND DATE(created_at)=CURDATE()"
         expense_filter = "AND DATE(created_at)=CURDATE()"
+
     elif filter_type == "month":
         income_filter = "AND MONTH(created_at)=MONTH(CURDATE())"
         expense_filter = "AND MONTH(created_at)=MONTH(CURDATE())"
@@ -164,61 +164,140 @@ def dashboard():
 
     balance = income - expenses
 
-    # ================= RECENT =================
+    # ================= RECENT TRANSACTIONS =================
     cur.execute("""
-        SELECT 'Income' AS type, amount, created_at FROM income
+        SELECT 'Income' AS type, amount, created_at
+        FROM income
         WHERE user_id=%s AND deleted_at IS NULL
+
         UNION ALL
-        SELECT 'Expense', amount, created_at FROM expenses
+
+        SELECT 'Expense' AS type, amount, created_at
+        FROM expenses
         WHERE user_id=%s AND deleted_at IS NULL
+
         ORDER BY created_at DESC
         LIMIT 10
     """, (user_id, user_id))
 
     transactions = cur.fetchall()
+
+    # ================= MONTHLY DATA =================
+    cur.execute("""
+        SELECT DATE_FORMAT(created_at,'%%Y-%%m') AS month,
+               SUM(amount) AS total
+        FROM income
+        WHERE user_id=%s AND deleted_at IS NULL
+        GROUP BY month
+    """, (user_id,))
+    income_months = cur.fetchall()
+
+    cur.execute("""
+        SELECT DATE_FORMAT(created_at,'%%Y-%%m') AS month,
+               SUM(amount) AS total
+        FROM expenses
+        WHERE user_id=%s AND deleted_at IS NULL
+        GROUP BY month
+    """, (user_id,))
+    expense_months = cur.fetchall()
+
     conn.close()
 
+    # ================= PREPARE CHART DATA =================
+    months = list(set(
+        [m['month'] for m in income_months] +
+        [m['month'] for m in expense_months]
+    ))
+    months.sort()
+
+    income_values = []
+    expense_values = []
+
+    for m in months:
+        inc = next((x['total'] for x in income_months if x['month'] == m), 0)
+        exp = next((x['total'] for x in expense_months if x['month'] == m), 0)
+
+        income_values.append(float(inc))
+        expense_values.append(float(exp))
+
     # ================= NOTIFICATION =================
-    notification = ""
     if balance < 0:
-        notification = "<div style='background:red;color:white;padding:10px;'>⚠ Negative balance!</div>"
+        notification = "<div style='background:red;color:white;padding:10px;'>⚠ Negative Balance</div>"
     else:
-        notification = "<div style='background:green;color:white;padding:10px;'>✅ All good</div>"
+        notification = "<div style='background:green;color:white;padding:10px;'>✅ System OK</div>"
 
+    # ================= HTML =================
     return f"""
-    <h1>HIRWA SMART</h1>
+    <html>
+    <head>
+        <title>HIRWA SMART</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </head>
 
-    {notification}
+    <body style="font-family:Arial;background:#f5f5f5;padding:20px;">
 
-    <form method="GET">
-        <select name="filter">
-            <option value="all">All</option>
-            <option value="today">Today</option>
-            <option value="month">Month</option>
-        </select>
-        <button>Filter</button>
-    </form>
+        <h1>🔥 HIRWA SMART Dashboard</h1>
 
-    <h3>Income: {income}</h3>
-    <h3>Expenses: {expenses}</h3>
-    <h3>Balance: {balance}</h3>
+        {notification}
 
-    <hr>
+        <form method="GET">
+            <select name="filter">
+                <option value="all">All</option>
+                <option value="today">Today</option>
+                <option value="month">This Month</option>
+            </select>
+            <button>Filter</button>
+        </form>
 
-    <h2>Recent Transactions</h2>
-    <table border="1">
-        <tr><th>Type</th><th>Amount</th><th>Date</th></tr>
-        {"".join([f"<tr><td>{t['type']}</td><td>{t['amount']}</td><td>{t['created_at']}</td></tr>" for t in transactions])}
-    </table>
+        <h3>Income: {income}</h3>
+        <h3>Expenses: {expenses}</h3>
+        <h3>Balance: {balance}</h3>
 
-    <br><br>
-    <a href="/income">Income</a> |
-    <a href="/expenses">Expenses</a> |
-    <a href="/logout">Logout</a>
+        <hr>
+
+        <h2>Recent Transactions</h2>
+        <table border="1" cellpadding="6">
+            <tr><th>Type</th><th>Amount</th><th>Date</th></tr>
+            {"".join([f"<tr><td>{t['type']}</td><td>{t['amount']}</td><td>{t['created_at']}</td></tr>" for t in transactions])}
+        </table>
+
+        <hr>
+
+        <h2>Charts</h2>
+        <canvas id="chart1"></canvas>
+
+        <script>
+        new Chart(document.getElementById('chart1'), {{
+            type: 'bar',
+            data: {{
+                labels: {months},
+                datasets: [
+                    {{
+                        label: 'Income',
+                        data: {income_values},
+                        backgroundColor: 'green'
+                    }},
+                    {{
+                        label: 'Expenses',
+                        data: {expense_values},
+                        backgroundColor: 'red'
+                    }}
+                ]
+            }}
+        }});
+        </script>
+
+        <br>
+        <a href="/income">Income</a> |
+        <a href="/expenses">Expenses</a> |
+        <a href="/logout">Logout</a>
+
+    </body>
+    </html>
     """
 
 
-# ================= SIMPLE ROUTES PLACEHOLDERS =================
+# ================= PLACEHOLDERS =================
 @app.route('/income')
 def income():
     return "Income page"
@@ -232,6 +311,5 @@ def activities():
     return "Activities page"
 
 
-# ================= RUN =================
 if __name__ == "__main__":
     app.run(debug=True)
