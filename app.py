@@ -299,50 +299,6 @@ a{ color:black; text-decoration:none; }
 </html>
 """
 
-@app.route('/dashboard')
-def dashboard():
-    if 'user_id' not in session:
-        return redirect('/login')
-
-    conn = get_db()
-    cur = conn.cursor(pymysql.cursors.DictCursor)
-    user_id = session['user_id']
-
-    # ================= INCOME =================
-    cur.execute("""
-        SELECT COALESCE(SUM(amount),0) AS total_income
-        FROM income
-        WHERE user_id=%s AND deleted_at IS NULL
-    """, (user_id,))
-    income = cur.fetchone()['total_income']
-
-    # ================= EXPENSES =================
-    cur.execute("""
-        SELECT COALESCE(SUM(amount),0) AS total_expenses
-        FROM expenses
-        WHERE user_id=%s AND deleted_at IS NULL
-    """, (user_id,))
-    expenses = cur.fetchone()['total_expenses']
-
-    balance = float(income) - float(expenses)
-
-    conn.close()
-
-    return f"""
-    <h1>HIRWA SMART</h1>
-
-    <h2>Summary</h2>
-
-    <h3>Income: RWF {income}</h3>
-    <h3>Expenses: RWF {expenses}</h3>
-    <h3>Balance: RWF {balance}</h3>
-
-    <hr>
-
-    <a href="/income">💰 Income</a><br>
-    <a href="/expenses">💸 Expenses</a><br>
-    <a href="/activities">📋 Activities</a><br>
-    """
 # ================= INCOME =================
 # ================= INCOME (CLEAN VERSION) =================
 
@@ -664,7 +620,242 @@ def expenses_excel():
 
     wb.save(file)
     return send_file(file, as_attachment=True)
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect('/login')
 
+    filter_type = request.args.get('filter', 'all')
+
+    conn = get_db()
+    cur = conn.cursor(pymysql.cursors.DictCursor)
+    user_id = session['user_id']
+
+    # ================= FILTERS =================
+    income_filter = ""
+    expense_filter = ""
+
+    if filter_type == "today":
+        income_filter = "AND DATE(created_at) = CURDATE()"
+        expense_filter = "AND DATE(created_at) = CURDATE()"
+
+    elif filter_type == "month":
+        income_filter = "AND MONTH(created_at) = MONTH(CURDATE())"
+        expense_filter = "AND MONTH(created_at) = MONTH(CURDATE())"
+
+    # ================= SUMMARY =================
+    cur.execute(f"""
+        SELECT COALESCE(SUM(amount),0) AS total_income
+        FROM income
+        WHERE user_id=%s AND deleted_at IS NULL {income_filter}
+    """, (user_id,))
+    income = float(cur.fetchone()['total_income'])
+
+    cur.execute(f"""
+        SELECT COALESCE(SUM(amount),0) AS total_expenses
+        FROM expenses
+        WHERE user_id=%s AND deleted_at IS NULL {expense_filter}
+    """, (user_id,))
+    expenses = float(cur.fetchone()['total_expenses'])
+
+    balance = income - expenses
+
+    # ================= RECENT TRANSACTIONS =================
+    cur.execute("""
+        SELECT 'Income' AS type, amount, created_at
+        FROM income
+        WHERE user_id=%s AND deleted_at IS NULL
+
+        UNION ALL
+
+        SELECT 'Expense' AS type, amount, created_at
+        FROM expenses
+        WHERE user_id=%s AND deleted_at IS NULL
+
+        ORDER BY created_at DESC
+        LIMIT 10
+    """, (user_id, user_id))
+
+    transactions = cur.fetchall()
+
+    # ================= MONTHLY DATA =================
+    cur.execute("""
+        SELECT DATE_FORMAT(created_at, '%%Y-%%m') AS month,
+               SUM(amount) AS total
+        FROM income
+        WHERE user_id=%s AND deleted_at IS NULL
+        GROUP BY month
+        ORDER BY month ASC
+    """, (user_id,))
+    income_months = cur.fetchall()
+
+    cur.execute("""
+        SELECT DATE_FORMAT(created_at, '%%Y-%%m') AS month,
+               SUM(amount) AS total
+        FROM expenses
+        WHERE user_id=%s AND deleted_at IS NULL
+        GROUP BY month
+        ORDER BY month ASC
+    """, (user_id,))
+    expense_months = cur.fetchall()
+
+    conn.close()
+
+    # ================= PREPARE DATA =================
+    months = list(set(
+        [m['month'] for m in income_months] +
+        [m['month'] for m in expense_months]
+    ))
+    months.sort()
+
+    income_values = []
+    expense_values = []
+
+    for m in months:
+        inc = next((x['total'] for x in income_months if x['month'] == m), 0)
+        exp = next((x['total'] for x in expense_months if x['month'] == m), 0)
+
+        income_values.append(float(inc))
+        expense_values.append(float(exp))
+
+    # ================= NOTIFICATION =================
+    notification = ""
+    if balance < 0:
+        notification = "<div style='background:red;color:white;padding:10px;border-radius:5px;'>⚠ Warning: You are in negative balance!</div>"
+    else:
+        notification = "<div style='background:green;color:white;padding:10px;border-radius:5px;'>✅ System OK: Financial status healthy</div>"
+
+    # ================= HTML =================
+    return f"""
+    <html>
+    <head>
+        <title>HIRWA SMART Dashboard</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <style>
+            body {{
+                font-family: Arial;
+                padding: 20px;
+                background: #f8f9fa;
+            }}
+
+            .card {{
+                display: inline-block;
+                padding: 15px;
+                margin: 10px;
+                border-radius: 12px;
+                background: white;
+                width: 180px;
+                box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
+            }}
+
+            table {{
+                width: 100%;
+                background: white;
+            }}
+        </style>
+    </head>
+
+    <body>
+        <h1>🔥 HIRWA SMART Dashboard</h1>
+
+        <!-- ================= NOTIFICATION ================= -->
+        {notification}
+
+        <hr>
+
+        <!-- ================= FILTERS ================= -->
+        <form method="GET">
+            <select name="filter">
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="month">This Month</option>
+            </select>
+            <button type="submit">Apply</button>
+        </form>
+
+        <hr>
+
+        <!-- ================= SUMMARY ================= -->
+        <div class="card">💰 Income<br><b>RWF {income}</b></div>
+        <div class="card">💸 Expenses<br><b>RWF {expenses}</b></div>
+        <div class="card">📊 Balance<br><b>RWF {balance}</b></div>
+
+        <hr>
+
+        <!-- ================= PIE CHART ================= -->
+        <h2>Income vs Expenses</h2>
+        <canvas id="pieChart"></canvas>
+
+        <hr>
+
+        <!-- ================= LINE CHART ================= -->
+        <h2>Monthly Overview</h2>
+        <canvas id="lineChart"></canvas>
+
+        <hr>
+
+        <!-- ================= RECENT ================= -->
+        <h2>Recent Transactions</h2>
+
+        <table border="1" cellpadding="8">
+            <tr>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Date</th>
+            </tr>
+
+            {"".join([
+                f"<tr><td>{t['type']}</td><td>{t['amount']}</td><td>{t['created_at']}</td></tr>"
+                for t in transactions
+            ])}
+        </table>
+
+        <hr>
+
+        <!-- ================= LINKS ================= -->
+        <a href="/income">💰 Income</a> |
+        <a href="/expenses">💸 Expenses</a> |
+        <a href="/activities">📋 Activities</a>
+
+        <!-- ================= CHART JS ================= -->
+        <script>
+        new Chart(document.getElementById('pieChart'), {{
+            type: 'pie',
+            data: {{
+                labels: ['Income', 'Expenses'],
+                datasets: [{{
+                    data: [{income}, {expenses}],
+                    backgroundColor: ['#28a745', '#dc3545']
+                }}]
+            }}
+        }});
+
+        new Chart(document.getElementById('lineChart'), {{
+            type: 'line',
+            data: {{
+                labels: {months},
+                datasets: [
+                    {{
+                        label: 'Income',
+                        data: {income_values},
+                        borderColor: '#28a745',
+                        fill: false
+                    }},
+                    {{
+                        label: 'Expenses',
+                        data: {expense_values},
+                        borderColor: '#dc3545',
+                        fill: false
+                    }}
+                ]
+            }}
+        }});
+        </script>
+
+    </body>
+    </html>
+    """
 # ================= ACTIVITIES =================
 # ================= ACTIVITIES =================
 @app.route("/activities", methods=["GET", "POST"])
