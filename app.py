@@ -189,24 +189,28 @@ def income():
         return redirect("/income")
 
     if request.method == "POST":
-        cur.execute("""INSERT INTO income(amount,source,date,note,user_id)
-                       VALUES(%s,%s,%s,%s,%s)""",
-                    (request.form["amount"], request.form["source"],
-                     request.form["date"], request.form["note"], uid))
-        db.commit()
-        return redirect("/income")
+    cur.execute("""INSERT INTO income(amount,source,date,note,user_id)
+                   VALUES(%s,%s,%s,%s,%s)""",
+                (request.form["amount"], request.form["source"],
+                 request.form["date"], request.form["note"], uid))
+    db.commit()
+    return redirect("/income")
 
-    cur.execute("SELECT * FROM income WHERE user_id=%s AND deleted_at IS NULL", (uid,))
-    rows = cur.fetchall()
- def some_function():
-    table = "".join([
-        f"<tr><td>{r['amount']}</td><td>{r['category']}</td><td>{r['date']}</td></tr>"
-        for r in rows
-    ])
-    return f"""
-    <a href="/logout" style="float:right;">Logout</a>
-    <h2>Income</h2>
+cur.execute("SELECT * FROM income WHERE user_id=%s AND deleted_at IS NULL", (uid,))
+rows = cur.fetchall()
 
+table = "".join([
+    f"<tr><td>{r['amount']}</td><td>{r['category']}</td><td>{r['date']}</td></tr>"
+    for r in rows
+])
+
+return f"""
+<a href="/logout" style="float:right;">Logout</a>
+<h2>Income</h2>
+<table>
+{table}
+</table>
+"""
     <form method="POST">
         <input name="amount" placeholder="Amount">
         <input name="source" placeholder="Source">
