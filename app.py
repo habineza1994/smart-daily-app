@@ -485,17 +485,9 @@ def income_pdf():
     return send_file(file, as_attachment=True)
 
 
-@app.route('/income/report/docx')
-def income_docx():
-from flask import request, redirect, session, send_file
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
-from openpyxl import Workbook
-from docx import Document
-
 # ================= INCOME =================
 @app.route('/income', methods=['GET', 'POST'])
-def income():
+def income_page():
     if 'user_id' not in session:
         return redirect('/login')
 
@@ -610,7 +602,7 @@ def income():
 
 # ================= PDF =================
 @app.route('/income/report/pdf')
-def income_pdf():
+def income_pdf_report():
     if 'user_id' not in session:
         return redirect('/login')
 
@@ -839,26 +831,36 @@ def expenses_docx():
 
     doc.save(file)
     return send_file(file, as_attachment=True)
-
-
 @app.route('/expenses/report/excel')
 def expenses_excel():
+    if 'user_id' not in session:
+        return redirect('/login')
+
     conn = get_db()
     cur = conn.cursor(pymysql.cursors.DictCursor)
-    cur.execute("SELECT * FROM expenses WHERE user_id=%s", (session['user_id'],))
+
+    cur.execute(
+        "SELECT amount, category, date, note FROM expenses WHERE user_id=%s AND deleted_at IS NULL ORDER BY id DESC",
+        (session['user_id'],)
+    )
     rows = cur.fetchall()
     conn.close()
 
     file = "expenses_report.xlsx"
     wb = Workbook()
     ws = wb.active
+    ws.title = "Expenses"
+
+    # Header
     ws.append(["Amount", "Category", "Date", "Note"])
 
+    # Data
     for r in rows:
         ws.append([r['amount'], r['category'], r['date'], r['note']])
 
     wb.save(file)
     return send_file(file, as_attachment=True)
+
 # ================= ACTIVITIES =================
 # ================= ACTIVITIES =================
 @app.route("/activities", methods=["GET", "POST"])
