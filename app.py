@@ -1,11 +1,11 @@
 import os
 import datetime
 import pymysql
-
 from flask import Flask, request, redirect, session, send_file
 
 app = Flask(__name__)
 app.secret_key = "hirwa_secret_key"
+
 
 # ================= DB =================
 def get_db():
@@ -16,6 +16,7 @@ def get_db():
         database=os.environ.get('MYSQLDATABASE'),
         cursorclass=pymysql.cursors.DictCursor
     )
+
 
 # ================= INIT DB =================
 @app.route("/initdb")
@@ -65,7 +66,7 @@ def init_db():
     return "DB READY"
 
 
-# ================= REGISTER =================
+# ================= AUTH =================
 @app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
@@ -81,31 +82,28 @@ def register():
     return """
     <h2>Register</h2>
     <form method="POST">
-        Username:<input name="username"><br>
-        Password:<input name="password"><br>
-        <button>Register</button>
+    Username:<input name="username"><br>
+    Password:<input name="password"><br>
+    <button>Register</button>
     </form>
     """
 
 
-# ================= LOGIN (FIXED SESSION) =================
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
         db = get_db()
         cur = db.cursor()
 
-        cur.execute(
-            "SELECT * FROM users WHERE username=%s AND password=%s",
-            (request.form['username'], request.form['password'])
-        )
+        cur.execute("SELECT * FROM users WHERE username=%s AND password=%s",
+                    (request.form['username'], request.form['password']))
         user = cur.fetchone()
 
         if user:
             session['user_id'] = user['id']
             return redirect("/dashboard")
-        else:
-            return "Login failed ❌"
+
+        return "Login failed ❌"
 
     return """
     <h2>Login</h2>
@@ -123,125 +121,100 @@ def logout():
     return redirect("/login")
 
 
-# ================= DASHBOARD (ONE CLEAN VERSION ONLY) =================
+# ================= DASHBOARD (YOUR ORIGINAL UI RESTORED) =================
 @app.route("/dashboard")
 def dashboard():
     if 'user_id' not in session:
         return redirect('/login')
 
     user_id = session['user_id']
-    filter_type = request.args.get('filter', 'all')
-
     conn = get_db()
     cur = conn.cursor()
 
-    income_filter = ""
-    expense_filter = ""
-
-    if filter_type == "today":
-        income_filter = "AND DATE(created_at)=CURDATE()"
-        expense_filter = "AND DATE(created_at)=CURDATE()"
-    elif filter_type == "month":
-        income_filter = "AND MONTH(created_at)=MONTH(CURDATE())"
-        expense_filter = "AND MONTH(created_at)=MONTH(CURDATE())"
-
-    # ================= SUMMARY =================
-    cur.execute(f"""
-        SELECT COALESCE(SUM(amount),0) total FROM income
-        WHERE user_id=%s AND deleted_at IS NULL {income_filter}
-    """, (user_id,))
+    # SUMMARY (safe addition only)
+    cur.execute("SELECT COALESCE(SUM(amount),0) total FROM income WHERE user_id=%s", (user_id,))
     income = float(cur.fetchone()['total'])
 
-    cur.execute(f"""
-        SELECT COALESCE(SUM(amount),0) total FROM expenses
-        WHERE user_id=%s AND deleted_at IS NULL {expense_filter}
-    """, (user_id,))
+    cur.execute("SELECT COALESCE(SUM(amount),0) total FROM expenses WHERE user_id=%s", (user_id,))
     expenses = float(cur.fetchone()['total'])
 
     balance = income - expenses
 
-    # ================= RECENT =================
-    cur.execute("""
-        SELECT 'Income' type, amount, created_at FROM income
-        WHERE user_id=%s AND deleted_at IS NULL
-        UNION ALL
-        SELECT 'Expense', amount, created_at FROM expenses
-        WHERE user_id=%s AND deleted_at IS NULL
-        ORDER BY created_at DESC LIMIT 10
-    """, (user_id, user_id))
-
-    transactions = cur.fetchall()
-
-    # ================= ACTIVITY COUNT =================
+    # activity count
     cur.execute("SELECT COUNT(*) c FROM activities WHERE user_id=%s", (user_id,))
     activity_count = cur.fetchone()['c']
 
     conn.close()
 
-    notification = """
-    <div style='padding:10px;background:#28a745;color:white;border-radius:8px;'>
-    System OK ✅
-    </div>
-    """
-    if balance < 0:
-        notification = """
-        <div style='padding:10px;background:red;color:white;border-radius:8px;'>
-        ⚠ Negative Balance Warning!
-        </div>
-        """
-
-    rows_html = ""
-    for t in transactions:
-        rows_html += f"<tr><td>{t['type']}</td><td>{t['amount']}</td><td>{t['created_at']}</td></tr>"
-
     return f"""
-    <html>
-    <head>
-    <title>HIRWA SMART</title>
-    </head>
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <body style="font-family:Arial;background:#f4f6fb;padding:20px;">
+<style>
+body{{margin:0;font-family:Arial;background:#f4f6fb}}
 
-    <h1>🔥 HIRWA SMART</h1>
+.header{{
+    background:linear-gradient(90deg,#4e54c8,#8f94fb);
+    color:white;padding:20px;text-align:center;
+    font-size:22px;font-weight:bold;
+}}
 
-    {notification}
+.card{{
+    background:white;margin:15px;padding:18px;
+    border-radius:15px;box-shadow:0 4px 10px rgba(0,0,0,0.08);
+    display:flex;justify-content:space-between;
+}}
 
-    <h3>Summary</h3>
-    <p>💰 Income: {income}</p>
-    <p>💸 Expenses: {expenses}</p>
-    <p>📊 Balance: {balance}</p>
-    <p>📋 Activities: {activity_count}</p>
+.income{{border-left:8px solid #28a745}}
+.expense{{border-left:8px solid #dc3545}}
+.activity{{border-left:8px solid #007bff}}
 
-    <hr>
+.summary{{
+    margin:15px;background:white;padding:15px;border-radius:15px;
+}}
 
-    <form method="GET">
-        <select name="filter">
-            <option value="all">All</option>
-            <option value="today">Today</option>
-            <option value="month">This Month</option>
-        </select>
-        <button>Filter</button>
-    </form>
+.box{{width:32%;padding:12px;border-radius:10px;color:white;text-align:center}}
 
-    <h3>Recent Transactions</h3>
-    <table border="1" cellpadding="8">
-        <tr><th>Type</th><th>Amount</th><th>Date</th></tr>
-        {rows_html}
-    </table>
+.income-box{{background:#28a745}}
+.expense-box{{background:#dc3545}}
+.balance-box{{background:#007bff}}
+</style>
+</head>
 
-    <hr>
+<body>
 
-    <a href="/income">Income</a> |
-    <a href="/expenses">Expenses</a> |
-    <a href="/activities">Activities</a> |
-    <a href="/logout">Logout</a>
+<div class="header">HIRWA SMART</div>
 
-    </body>
-    </html>
-    """
+<div class="card income" onclick="location.href='/income'">
+<h2>💰 Income</h2><span>Track income</span>
+</div>
+
+<div class="card expense" onclick="location.href='/expenses'">
+<h2>💸 Expenses</h2><span>Track expenses</span>
+</div>
+
+<div class="card activity" onclick="location.href='/activities'">
+<h2>📋 Activities</h2><span>{activity_count} activities</span>
+</div>
+
+<div class="summary">
+<h3>Summary</h3>
+<div style="display:flex;justify-content:space-between">
+<div class="box income-box">Income<br>{income}</div>
+<div class="box expense-box">Expenses<br>{expenses}</div>
+<div class="box balance-box">Balance<br>{balance}</div>
+</div>
+</div>
+
+</body>
+</html>
+"""
 
 
-# ================= ACTIVITIES (NEW) =================
+# ================= ACTIVITIES =================
 @app.route("/activities", methods=["GET","POST"])
 def activities():
     if 'user_id' not in session:
@@ -269,9 +242,10 @@ def activities():
     rows = cur.fetchall()
     conn.close()
 
-    table = ""
-    for r in rows:
-        table += f"<tr><td>{r['activity_name']}</td><td>{r['date']}</td><td>{r['description']}</td></tr>"
+    table = "".join(
+        f"<tr><td>{r['activity_name']}</td><td>{r['date']}</td><td>{r['description']}</td></tr>"
+        for r in rows
+    )
 
     return f"""
     <h2>Activities</h2>
@@ -289,7 +263,6 @@ def activities():
         {table}
     </table>
 
-    <br>
     <a href="/dashboard">Back</a>
     """
 
