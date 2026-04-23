@@ -299,13 +299,6 @@ a{ color:black; text-decoration:none; }
 </html>
 """
 
-# ================= INCOME =================
-from flask import Response
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
-from openpyxl import Workbook
-from docx import Document
-
 
 # ================= INCOME =================
 @app.route('/income', methods=['GET', 'POST'])
