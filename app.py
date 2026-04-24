@@ -1,14 +1,8 @@
 import os
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> Stashed changes
 from ai_engine import analyze_finance
 import datetime
->>>>>>> Stashed changes
 import pymysql
-from flask import Flask, request, redirect, session
+from flask import Flask, request, redirect, session, send_file
 
 app = Flask(__name__)
 app.secret_key = "hirwa_secret_key"
@@ -68,7 +62,7 @@ def init_db():
     return "DB READY"
 
 
-# ================= LOGIN (YOUR DESIGN RESTORED) =================
+# ================= LOGIN =================
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
@@ -85,13 +79,11 @@ def login():
 
         return "Login failed ❌"
 
-    return """
-<!DOCTYPE html>
+    return """<!DOCTYPE html>
 <html>
 <head>
 <title>HIRWA SMART Login</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <style>
 body{
     margin:0;
@@ -102,7 +94,6 @@ body{
     justify-content:center;
     align-items:center;
 }
-
 .card{
     background:white;
     width:92%;
@@ -111,7 +102,6 @@ body{
     border-radius:20px;
     box-shadow:0 10px 25px rgba(0,0,0,0.15);
 }
-
 input{
     width:100%;
     padding:14px;
@@ -119,7 +109,6 @@ input{
     border-radius:10px;
     border:1px solid #ddd;
 }
-
 button{
     width:100%;
     padding:14px;
@@ -130,7 +119,6 @@ button{
 }
 </style>
 </head>
-
 <body>
 <div class="card">
 <h2 style="text-align:center;">HIRWA SMART</h2>
@@ -151,7 +139,7 @@ def logout():
     return redirect("/login")
 
 
-# ================= DASHBOARD (FULL DESIGN RESTORED) =================
+# ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
     if 'user_id' not in session:
@@ -161,7 +149,6 @@ def dashboard():
     db = get_db()
     cur = db.cursor()
 
-    # FILTER (safe)
     filter_type = request.args.get('filter','all')
 
     income_filter = ""
@@ -174,7 +161,6 @@ def dashboard():
         income_filter = "AND MONTH(date)=MONTH(CURDATE())"
         expense_filter = "AND MONTH(date)=MONTH(CURDATE())"
 
-    # SUMMARY
     cur.execute(f"SELECT COALESCE(SUM(amount),0) t FROM income WHERE user_id=%s {income_filter}", (user_id,))
     income = float(cur.fetchone()['t'])
 
@@ -183,98 +169,36 @@ def dashboard():
 
     balance = income - expenses
 
-    # ACTIVITY COUNT
     cur.execute("SELECT COUNT(*) c FROM activities WHERE user_id=%s", (user_id,))
     act = cur.fetchone()['c']
 
     db.close()
 
-    # NOTIFICATION
     notif = "<div style='padding:10px;background:green;color:white;border-radius:8px'>System OK</div>"
     if balance < 0:
         notif = "<div style='padding:10px;background:red;color:white;border-radius:8px'>Low Balance Warning ⚠</div>"
 
-    return f"""
-<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html>
 <head>
 <title>Dashboard</title>
-
-<style>
-body{{margin:0;font-family:Arial;background:#f4f6fb}}
-
-.header{{
-    background:linear-gradient(90deg,#4e54c8,#8f94fb);
-    color:white;
-    padding:20px;
-    text-align:center;
-    font-size:22px;
-    font-weight:bold;
-}}
-
-.card{{
-    background:white;
-    margin:15px;
-    padding:18px;
-    border-radius:15px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.08);
-}}
-
-.summary{{
-    margin:15px;
-    background:white;
-    padding:15px;
-    border-radius:15px;
-}}
-
-.box{{width:32%;padding:12px;border-radius:10px;color:white;text-align:center}}
-
-.income-box{{background:#28a745}}
-.expense-box{{background:#dc3545}}
-.balance-box{{background:#007bff}}
-
-a{{text-decoration:none;color:black}}
-</style>
 </head>
-
 <body>
-
-<div class="header">HIRWA SMART</div>
-
 {notif}
-
-<div class="card">
-<h3>Menu</h3>
-<a href="/income">💰 Income</a><br>
-<a href="/expenses">💸 Expenses</a><br>
-<a href="/activities">📋 Activities</a><br>
-<a href="/logout">🚪 Logout</a>
-</div>
-
-<div class="card">
-<form method="GET">
-<select name="filter">
-<option value="all">All</option>
-<option value="today">Today</option>
-<option value="month">This Month</option>
-</select>
-<button>Filter</button>
-</form>
-</div>
-
-<div class="summary">
-<h3>Summary</h3>
-<div style="display:flex;justify-content:space-between">
-<div class="box income-box">Income<br>{income}</div>
-<div class="box expense-box">Expenses<br>{expenses}</div>
-<div class="box balance-box">Balance<br>{balance}</div>
-</div>
-<p>Activities: {act}</p>
-</div>
-
+Income: {income}<br>
+Expenses: {expenses}<br>
+Balance: {balance}<br>
+Activities: {act}<br>
+<a href='/income'>Income</a><br>
+<a href='/expenses'>Expenses</a><br>
+<a href='/activities'>Activities</a><br>
+<a href='/ai_advice'>AI Advice</a><br>
+<a href='/logout'>Logout</a>
 </body>
 </html>
 """
+
+
 # ---------- INCOME ----------
 @app.route('/income', methods=['GET','POST'])
 def income():
@@ -297,47 +221,25 @@ def income():
     rows = cur.fetchall()
 
     table = ""
-for r in rows:
-    table += f"""
-    <tr>
-    <td>{r['amount']}</td>
-    <td>{r['source']}</td>
-    <td>{r['date']}</td>
-    <td>{r['note']}</td>
-    <td>{r['created_at']}</td>
-    <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
-    </tr>
+    for r in rows:
+        table += f"""
+        <tr>
+        <td>{r['amount']}</td>
+        <td>{r['source']}</td>
+        <td>{r['date']}</td>
+        <td>{r['note']}</td>
+        <td>{r['created_at']}</td>
+        <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
+        </tr>
+        """
+
+    return f"""
+    {STYLE}
+    <h2>💰 Income</h2>
+    <a class='btn' href='/income_pdf'>PDF</a>
+    <table>{table}</table>
     """
 
-return f"""
-{STYLE}
-<h2>💰 Income</h2>
-<a class='btn' href='/income_pdf'>PDF</a>
-
-<form method='POST'>
-    <input name='amount' placeholder='Amount' required>
-    <input name='source' placeholder='Source' required>
-    <input type='date' name='date' required>
-    <input name='note' placeholder='Note'>
-    <button>Save</button>
-</form>
-
-<table>
-<tr>
-<th>Amount</th>
-<th>Source</th>
-<th>Date</th>
-<th>Note</th>
-<th>Created</th>
-<th>Action</th>
-</tr>
-
-{table}
-
-</table>
-
-<a href='/dashboard'>Back</a>
-"""
 
 # ---------- INCOME PDF ----------
 @app.route('/income_pdf')
@@ -347,7 +249,7 @@ def income_pdf():
     rows = cur.fetchall()
 
     file = "/tmp/income.pdf"
-    doc = SimpleDocTemplate(file, pagesize=A4)
+    doc = SimpleDocTemplate(file)
 
     data = [["Amount","Source","Date"]]
     for r in rows:
@@ -355,6 +257,7 @@ def income_pdf():
 
     doc.build([Table(data)])
     return send_file(file, as_attachment=True)
+
 
 # ---------- EXPENSES ----------
 @app.route('/expenses', methods=['GET','POST'])
@@ -386,33 +289,18 @@ def expenses():
         <td>{r['date']}</td>
         <td>{r['note']}</td>
         <td>{r['created_at']}</td>
-        <td><a class='btn' href='?delete={r["id"]}'>Delete</a></td>
+        <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
         </tr>
         """
 
-    return f"""
-    {STYLE}
-    <h2>💸 Expenses</h2>
-    <a class='btn' href='/dashboard'>Back</a>
-    <form method='POST'>
-        <input name='amount' placeholder='Amount' required>
-        <input name='category' placeholder='Category' required>
-        <input type='date' name='date' required>
-        <input name='note' placeholder='Note'>
-        <button>Save</button>
-    </form>
-    <table>
-    <tr><th>Amount</th><th>Category</th><th>Date</th><th>Note</th><th>Created</th><th>Action</th></tr>
-    {table}
-    </table>
-    """
+    return f"<table>{table}</table>"
+
 
 # ---------- ACTIVITIES ----------
 @app.route('/activities', methods=['GET','POST'])
 def activities():
     db = get_db(); cur = db.cursor()
 
-    # ✅ FIX 1: login check (ishyizwe ahakwiye)
     if 'user_id' not in session:
         return redirect('/login')
 
@@ -441,26 +329,14 @@ def activities():
         <td>{r['date']}</td>
         <td>{r['description']}</td>
         <td>{r['created_at']}</td>
-        <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>  # ✅ FIX 2: quotes
+        <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
         </tr>
         """
 
-    return f"""
-    {STYLE}
-    <h2>📋 Activities</h2>
-    <a class='btn' href='/dashboard'>Back</a>
-    <form method='POST'>
-        <input name='name' placeholder='Activity name' required>
-        <input name='done_by' placeholder='Done by' required>
-        <input type='date' name='date' required>
-        <input name='description' placeholder='Description'>
-        <button>Save</button>
-    </form>
-    <table>
-    <tr><th>Name</th><th>Done by</th><th>Date</th><th>Description</th><th>Created</th><th>Action</th></tr>
-    {table}
-    </table>
-    """
+    return f"<table>{table}</table>"
+
+
+# ---------- AI ADVICE ----------
 @app.route('/ai_advice')
 def ai_advice():
     if 'user_id' not in session:
@@ -469,11 +345,9 @@ def ai_advice():
     conn = get_db()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
 
-    # Fata incomes
     cursor.execute("SELECT amount FROM income WHERE user_id=%s", (session['user_id'],))
     incomes = cursor.fetchall()
 
-    # Fata expenses
     cursor.execute("SELECT amount FROM expenses WHERE user_id=%s", (session['user_id'],))
     expenses = cursor.fetchall()
 
@@ -482,39 +356,13 @@ def ai_advice():
     summary, advice = analyze_finance(incomes, expenses)
 
     return f"""
-<<<<<<< Updated upstream
-=======
-    <h2>SERVER ERROR</h2>
-    <pre>{e}</pre>
-    """, 500
-
-@app.route('/ai_advice')
-def ai_advice():
-    if 'user_id' not in session:
-        return redirect('/')
-
-    conn = get_db()
-    cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-    # Fata incomes
-    cursor.execute("SELECT amount FROM income WHERE user_id=%s", (session['user_id'],))
-    incomes = cursor.fetchall()
-
-    # Fata expenses
-    cursor.execute("SELECT amount FROM expenses WHERE user_id=%s", (session['user_id'],))
-    expenses = cursor.fetchall()
-
-    conn.close()
-
-    summary, advice = analyze_finance(incomes, expenses)
-
-    return f"""
->>>>>>> Stashed changes
     <h2>🧠 AI Financial Advisor</h2>
     <pre>{summary}</pre>
     <h3>Advice:</h3>
     <p>{advice}</p>
-    <a href="/dashboard">⬅ Back to Dashboard</a>
+    <a href="/dashboard">⬅ Back</a>
     """
+
+
 if __name__ == "__main__":
     app.run(debug=True)
