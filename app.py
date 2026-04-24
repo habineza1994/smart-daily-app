@@ -4,6 +4,9 @@ import datetime
 import pymysql
 from flask import Flask, request, redirect, session, send_file
 
+from reportlab.platypus import SimpleDocTemplate, Table
+from reportlab.lib.pagesizes import A4
+
 app = Flask(__name__)
 app.secret_key = "hirwa_secret_key"
 
@@ -37,7 +40,9 @@ def init_db():
         source VARCHAR(255),
         date DATE,
         note TEXT,
-        user_id INT
+        user_id INT,
+        deleted INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""")
 
     cur.execute("""CREATE TABLE IF NOT EXISTS expenses(
@@ -46,7 +51,9 @@ def init_db():
         category VARCHAR(255),
         date DATE,
         note TEXT,
-        user_id INT
+        user_id INT,
+        deleted INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""")
 
     cur.execute("""CREATE TABLE IF NOT EXISTS activities(
@@ -55,7 +62,9 @@ def init_db():
         done_by VARCHAR(255),
         date DATE,
         description TEXT,
-        user_id INT
+        user_id INT,
+        deleted INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""")
 
     db.commit()
@@ -79,7 +88,8 @@ def login():
 
         return "Login failed ❌"
 
-    return """<!DOCTYPE html>
+    return """
+<!DOCTYPE html>
 <html>
 <head>
 <title>HIRWA SMART Login</title>
@@ -178,22 +188,57 @@ def dashboard():
     if balance < 0:
         notif = "<div style='padding:10px;background:red;color:white;border-radius:8px'>Low Balance Warning ⚠</div>"
 
-    return f"""<!DOCTYPE html>
+    return f"""
+<!DOCTYPE html>
 <html>
 <head>
 <title>Dashboard</title>
+<style>
+body{{margin:0;font-family:Arial;background:#f4f6fb}}
+.header{{background:linear-gradient(90deg,#4e54c8,#8f94fb);color:white;padding:20px;text-align:center;font-size:22px;font-weight:bold;}}
+.card{{background:white;margin:15px;padding:18px;border-radius:15px;box-shadow:0 4px 10px rgba(0,0,0,0.08);}}
+.summary{{margin:15px;background:white;padding:15px;border-radius:15px;}}
+.box{{width:32%;padding:12px;border-radius:10px;color:white;text-align:center}}
+.income-box{{background:#28a745}}
+.expense-box{{background:#dc3545}}
+.balance-box{{background:#007bff}}
+a{{text-decoration:none;color:black}}
+</style>
 </head>
 <body>
+
+<div class="header">HIRWA SMART</div>
 {notif}
-Income: {income}<br>
-Expenses: {expenses}<br>
-Balance: {balance}<br>
-Activities: {act}<br>
-<a href='/income'>Income</a><br>
-<a href='/expenses'>Expenses</a><br>
-<a href='/activities'>Activities</a><br>
-<a href='/ai_advice'>AI Advice</a><br>
-<a href='/logout'>Logout</a>
+
+<div class="card">
+<h3>Menu</h3>
+<a href="/income">💰 Income</a><br>
+<a href="/expenses">💸 Expenses</a><br>
+<a href="/activities">📋 Activities</a><br>
+<a href="/logout">🚪 Logout</a>
+</div>
+
+<div class="card">
+<form method="GET">
+<select name="filter">
+<option value="all">All</option>
+<option value="today">Today</option>
+<option value="month">This Month</option>
+</select>
+<button>Filter</button>
+</form>
+</div>
+
+<div class="summary">
+<h3>Summary</h3>
+<div style="display:flex;justify-content:space-between">
+<div class="box income-box">Income<br>{income}</div>
+<div class="box expense-box">Expenses<br>{expenses}</div>
+<div class="box balance-box">Balance<br>{balance}</div>
+</div>
+<p>Activities: {act}</p>
+</div>
+
 </body>
 </html>
 """
@@ -202,7 +247,8 @@ Activities: {act}<br>
 # ---------- INCOME ----------
 @app.route('/income', methods=['GET','POST'])
 def income():
-    db = get_db(); cur = db.cursor()
+    db = get_db()
+    cur = db.cursor()
 
     if request.method == 'POST':
         cur.execute("INSERT INTO income(amount,source,date,note) VALUES(%s,%s,%s,%s)",
@@ -234,35 +280,17 @@ def income():
         """
 
     return f"""
-    {STYLE}
-    <h2>💰 Income</h2>
-    <a class='btn' href='/income_pdf'>PDF</a>
-    <table>{table}</table>
-    """
-
-
-# ---------- INCOME PDF ----------
-@app.route('/income_pdf')
-def income_pdf():
-    db = get_db(); cur = db.cursor()
-    cur.execute("SELECT amount,source,date FROM income WHERE deleted=0")
-    rows = cur.fetchall()
-
-    file = "/tmp/income.pdf"
-    doc = SimpleDocTemplate(file)
-
-    data = [["Amount","Source","Date"]]
-    for r in rows:
-        data.append([r['amount'],r['source'],str(r['date'])])
-
-    doc.build([Table(data)])
-    return send_file(file, as_attachment=True)
+<h2>💰 Income</h2>
+<table>{table}</table>
+<a href='/dashboard'>Back</a>
+"""
 
 
 # ---------- EXPENSES ----------
 @app.route('/expenses', methods=['GET','POST'])
 def expenses():
-    db = get_db(); cur = db.cursor()
+    db = get_db()
+    cur = db.cursor()
 
     if request.method == 'POST':
         cur.execute("INSERT INTO expenses(amount,category,date,note) VALUES(%s,%s,%s,%s)",
@@ -271,38 +299,17 @@ def expenses():
         db.commit()
         return redirect('/expenses')
 
-    delete_id = request.args.get('delete')
-    if delete_id:
-        cur.execute("UPDATE expenses SET deleted=1 WHERE id=%s",(delete_id,))
-        db.commit()
-        return redirect('/expenses')
-
-    cur.execute("SELECT * FROM expenses WHERE deleted=0 ORDER BY id DESC")
-    rows = cur.fetchall()
-
-    table = ""
-    for r in rows:
-        table += f"""
-        <tr>
-        <td>{r['amount']}</td>
-        <td>{r['category']}</td>
-        <td>{r['date']}</td>
-        <td>{r['note']}</td>
-        <td>{r['created_at']}</td>
-        <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
-        </tr>
-        """
-
-    return f"<table>{table}</table>"
+    return "Expenses Page"
 
 
 # ---------- ACTIVITIES ----------
 @app.route('/activities', methods=['GET','POST'])
 def activities():
-    db = get_db(); cur = db.cursor()
-
     if 'user_id' not in session:
         return redirect('/login')
+
+    db = get_db()
+    cur = db.cursor()
 
     if request.method == 'POST':
         cur.execute("INSERT INTO activities(activity_name,done_by,date,description) VALUES(%s,%s,%s,%s)",
@@ -311,32 +318,10 @@ def activities():
         db.commit()
         return redirect('/activities')
 
-    delete_id = request.args.get('delete')
-    if delete_id:
-        cur.execute("UPDATE activities SET deleted=1 WHERE id=%s",(delete_id,))
-        db.commit()
-        return redirect('/activities')
-
-    cur.execute("SELECT * FROM activities WHERE deleted=0 ORDER BY id DESC")
-    rows = cur.fetchall()
-
-    table = ""
-    for r in rows:
-        table += f"""
-        <tr>
-        <td>{r['activity_name']}</td>
-        <td>{r['done_by']}</td>
-        <td>{r['date']}</td>
-        <td>{r['description']}</td>
-        <td>{r['created_at']}</td>
-        <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
-        </tr>
-        """
-
-    return f"<table>{table}</table>"
+    return "Activities Page"
 
 
-# ---------- AI ADVICE ----------
+# ---------- AI ----------
 @app.route('/ai_advice')
 def ai_advice():
     if 'user_id' not in session:
