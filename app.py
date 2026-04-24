@@ -299,7 +299,27 @@ def expenses():
         db.commit()
         return redirect('/expenses')
 
-    return "Expenses Page"
+    cur.execute("SELECT * FROM expenses WHERE deleted=0 ORDER BY id DESC")
+rows = cur.fetchall()
+
+table = ""
+for r in rows:
+    table += f"""
+    <tr>
+    <td>{r['amount']}</td>
+    <td>{r['category']}</td>
+    <td>{r['date']}</td>
+    <td>{r['note']}</td>
+    <td>{r['created_at']}</td>
+    <td><a href='?delete={r['id']}'>Delete</a></td>
+    </tr>
+    """
+
+return f"""
+<h2>💸 Expenses</h2>
+<table>{table}</table>
+<a href='/dashboard'>Back</a>
+"""
 
 
 # ---------- ACTIVITIES ----------
