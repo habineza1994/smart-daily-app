@@ -1,4 +1,4 @@
-import os
+noimport os
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 =======
@@ -410,24 +410,40 @@ def expenses():
 # ---------- ACTIVITIES ----------
 @app.route('/activities', methods=['GET','POST'])
 def activities():
-    db = get_db(); cur = db.cursor()
 
+    # ✅ CHECK LOGIN (HEJURU)
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    db = get_db()
+    cur = db.cursor()
+
+    # ✅ SAVE
     if request.method == 'POST':
-        cur.execute("INSERT INTO activities(activity_name,done_by,date,description) VALUES(%s,%s,%s,%s)",
-                    (request.form['name'],request.form['done_by'],
-                     request.form['date'],request.form['description']))
+        cur.execute(
+            "INSERT INTO activities(activity_name,done_by,date,description) VALUES(%s,%s,%s,%s)",
+            (
+                request.form['name'],
+                request.form['done_by'],
+                request.form['date'],
+                request.form['description']
+            )
+        )
         db.commit()
         return redirect('/activities')
 
+    # ✅ DELETE (soft delete)
     delete_id = request.args.get('delete')
     if delete_id:
-        cur.execute("UPDATE activities SET deleted=1 WHERE id=%s",(delete_id,))
+        cur.execute("UPDATE activities SET deleted=1 WHERE id=%s", (delete_id,))
         db.commit()
         return redirect('/activities')
 
+    # ✅ FETCH
     cur.execute("SELECT * FROM activities WHERE deleted=0 ORDER BY id DESC")
     rows = cur.fetchall()
 
+    # ✅ BUILD TABLE
     table = ""
     for r in rows:
         table += f"""
@@ -437,14 +453,17 @@ def activities():
         <td>{r['date']}</td>
         <td>{r['description']}</td>
         <td>{r['created_at']}</td>
-        <td><a class='btn' href='?delete={r["id"]}'>Delete</a></td>
+        <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
         </tr>
         """
 
+    # ✅ RETURN
     return f"""
     {STYLE}
     <h2>📋 Activities</h2>
+
     <a class='btn' href='/dashboard'>Back</a>
+
     <form method='POST'>
         <input name='name' placeholder='Activity name' required>
         <input name='done_by' placeholder='Done by' required>
@@ -452,26 +471,19 @@ def activities():
         <input name='description' placeholder='Description'>
         <button>Save</button>
     </form>
+
     <table>
-    <tr><th>Name</th><th>Done by</th><th>Date</th><th>Description</th><th>Created</th><th>Action</th></tr>
+    <tr>
+        <th>Name</th>
+        <th>Done by</th>
+        <th>Date</th>
+        <th>Description</th>
+        <th>Created</th>
+        <th>Action</th>
+    </tr>
     {table}
     </table>
     """
-' not in session:
-        return redirect('/login')
-
-    db = get_db()
-    cur = db.cursor()
-    user_id = session['user_id']
-
-    if request.method == 'POST':
-        cur.execute("INSERT INTO expenses(amount,category,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
-                    (request.form['amount'], request.form['category'], request.form['date'], request.form['note'], user_id))
-        db.commit()
-        return redirect('/expenses')
-
-    cur
-
 @app.route('/ai_advice')
 def ai_advice():
     if 'user_id' not in session:
