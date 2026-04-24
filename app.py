@@ -267,55 +267,177 @@ a{{text-decoration:none;color:black}}
 </body>
 </html>
 """
-
-
-# ================= INCOME (DESIGN FIXED) =================
+# ---------- INCOME ----------
 @app.route('/income', methods=['GET','POST'])
 def income():
-    if 'user_id' not in session:
-        return redirect('/login')
+    db = get_db(); cur = db.cursor()
 
-    db = get_db()
-    cur = db.cursor()
-    user_id = session['user_id']
+    if request.method == 'POST':
+        cur.execute("INSERT INTO income(amount,source,date,note) VALUES(%s,%s,%s,%s)",
+                    (request.form['amount'],request.form['source'],
+                     request.form['date'],request.form['note']))
+        db.commit()
+        return redirect('/income')
 
-    if request.method == 'POST':
-        cur.execute("INSERT INTO income(amount,source,date,note,user_id) VALUES(%s,%s,%s,%s,%s)",
-                    (request.form['amount'], request.form['source'], request.form['date'], request.form['note'], user_id))
-        db.commit()
-        return redirect('/income')
+    delete_id = request.args.get('delete')
+    if delete_id:
+        cur.execute("UPDATE income SET deleted=1 WHERE id=%s",(delete_id,))
+        db.commit()
+        return redirect('/income')
 
-    cur.execute("SELECT * FROM income WHERE user_id=%s", (user_id,))
-    rows = cur.fetchall()
+    cur.execute("SELECT * FROM income WHERE deleted=0 ORDER BY id DESC")
+    rows = cur.fetchall()
 
-    table = "".join(f"<tr><td>{r['amount']}</td><td>{r['source']}</td><td>{r['date']}</td></tr>" for r in rows)
+    table = ""
+    for r in rows:
+        table += f"""
+        <tr>
+        <td>{r['amount']}</td>
+        <td>{r['source']}</td>
+        <td>{r['date']}</td>
+        <td>{r['note']}</td>
+        <td>{r['created_at']}</td>
+        <td><a class='btn' href='?delete={r["id"]}'>Delete</a></td>
+        </tr>
+        """
 
-    return f"""
-    <div style="font-family:Arial;padding:20px">
-    <h2>💰 Income</h2>
+    return f"""
+    {STYLE}
+    <h2>💰 Income</h2>
+    <a class='btn' href='/income_pdf'>PDF</a>
+    <form method='POST'>
+        <input name='amount' placeholder='Amount' required>
+        <input name='source' placeholder='Source' required>
+        <input type='date' name='date' required>
+        <input name='note' placeholder='Note'>
+        <button>Save</button>
+    </form>
+    <table>
+    <tr><th>Amount</th><th>Source</th><th>Date</th><th>Note</th><th>Created</th><th>Action</th></tr>
+    {table}
+    </table>
+    <a href='/dashboard'>Back</a>
+    """
 
-    <form method="POST">
-        <input name="amount" placeholder="Amount"><br>
-        <input name="source" placeholder="Source"><br>
-        <input type="date" name="date"><br>
-        <input name="note" placeholder="Note"><br>
-        <button>Save</button>
-    </form>
+# ---------- INCOME PDF ----------
+@app.route('/income_pdf')
+def income_pdf():
+    db = get_db(); cur = db.cursor()
+    cur.execute("SELECT amount,source,date FROM income WHERE deleted=0")
+    rows = cur.fetchall()
 
-    <table border="1" cellpadding="8">
-    <tr><th>Amount</th><th>Source</th><th>Date</th></tr>
-    {table}
-    </table>
+    file = "/tmp/income.pdf"
+    doc = SimpleDocTemplate(file, pagesize=A4)
 
-    <a href="/dashboard">Back</a>
-    </div>
-    """
+    data = [["Amount","Source","Date"]]
+    for r in rows:
+        data.append([r['amount'],r['source'],str(r['date'])])
 
+    doc.build([Table(data)])
+    return send_file(file, as_attachment=True)
 
-# ================= EXPENSES (DESIGN FIXED) =================
+# ---------- EXPENSES ----------
 @app.route('/expenses', methods=['GET','POST'])
 def expenses():
-    if 'user_id' not in session:
+    db = get_db(); cur = db.cursor()
+
+    if request.method == 'POST':
+        cur.execute("INSERT INTO expenses(amount,category,date,note) VALUES(%s,%s,%s,%s)",
+                    (request.form['amount'],request.form['category'],
+                     request.form['date'],request.form['note']))
+        db.commit()
+        return redirect('/expenses')
+
+    delete_id = request.args.get('delete')
+    if delete_id:
+        cur.execute("UPDATE expenses SET deleted=1 WHERE id=%s",(delete_id,))
+        db.commit()
+        return redirect('/expenses')
+
+    cur.execute("SELECT * FROM expenses WHERE deleted=0 ORDER BY id DESC")
+    rows = cur.fetchall()
+
+    table = ""
+    for r in rows:
+        table += f"""
+        <tr>
+        <td>{r['amount']}</td>
+        <td>{r['category']}</td>
+        <td>{r['date']}</td>
+        <td>{r['note']}</td>
+        <td>{r['created_at']}</td>
+        <td><a class='btn' href='?delete={r["id"]}'>Delete</a></td>
+        </tr>
+        """
+
+    return f"""
+    {STYLE}
+    <h2>💸 Expenses</h2>
+    <a class='btn' href='/dashboard'>Back</a>
+    <form method='POST'>
+        <input name='amount' placeholder='Amount' required>
+        <input name='category' placeholder='Category' required>
+        <input type='date' name='date' required>
+        <input name='note' placeholder='Note'>
+        <button>Save</button>
+    </form>
+    <table>
+    <tr><th>Amount</th><th>Category</th><th>Date</th><th>Note</th><th>Created</th><th>Action</th></tr>
+    {table}
+    </table>
+    """
+
+# ---------- ACTIVITIES ----------
+@app.route('/activities', methods=['GET','POST'])
+def activities():
+    db = get_db(); cur = db.cursor()
+
+    if request.method == 'POST':
+        cur.execute("INSERT INTO activities(activity_name,done_by,date,description) VALUES(%s,%s,%s,%s)",
+                    (request.form['name'],request.form['done_by'],
+                     request.form['date'],request.form['description']))
+        db.commit()
+        return redirect('/activities')
+
+    delete_id = request.args.get('delete')
+    if delete_id:
+        cur.execute("UPDATE activities SET deleted=1 WHERE id=%s",(delete_id,))
+        db.commit()
+        return redirect('/activities')
+
+    cur.execute("SELECT * FROM activities WHERE deleted=0 ORDER BY id DESC")
+    rows = cur.fetchall()
+
+    table = ""
+    for r in rows:
+        table += f"""
+        <tr>
+        <td>{r['activity_name']}</td>
+        <td>{r['done_by']}</td>
+        <td>{r['date']}</td>
+        <td>{r['description']}</td>
+        <td>{r['created_at']}</td>
+        <td><a class='btn' href='?delete={r["id"]}'>Delete</a></td>
+        </tr>
+        """
+
+    return f"""
+    {STYLE}
+    <h2>📋 Activities</h2>
+    <a class='btn' href='/dashboard'>Back</a>
+    <form method='POST'>
+        <input name='name' placeholder='Activity name' required>
+        <input name='done_by' placeholder='Done by' required>
+        <input type='date' name='date' required>
+        <input name='description' placeholder='Description'>
+        <button>Save</button>
+    </form>
+    <table>
+    <tr><th>Name</th><th>Done by</th><th>Date</th><th>Description</th><th>Created</th><th>Action</th></tr>
+    {table}
+    </table>
+    """
+' not in session:
         return redirect('/login')
 
     db = get_db()
@@ -328,75 +450,7 @@ def expenses():
         db.commit()
         return redirect('/expenses')
 
-    cur.execute("SELECT * FROM expenses WHERE user_id=%s", (user_id,))
-    rows = cur.fetchall()
-
-    table = "".join(f"<tr><td>{r['amount']}</td><td>{r['category']}</td><td>{r['date']}</td></tr>" for r in rows)
-
-    return f"""
-    <div style="font-family:Arial;padding:20px">
-    <h2>💸 Expenses</h2>
-
-    <form method="POST">
-        <input name="amount" placeholder="Amount"><br>
-        <input name="category" placeholder="Category"><br>
-        <input type="date" name="date"><br>
-        <input name="note" placeholder="Note"><br>
-        <button>Save</button>
-    </form>
-
-    <table border="1" cellpadding="8">
-    <tr><th>Amount</th><th>Category</th><th>Date</th></tr>
-    {table}
-    </table>
-
-    <a href="/dashboard">Back</a>
-    </div>
-    """
-
-
-# ================= ACTIVITIES (DESIGN FIXED) =================
-@app.route('/activities', methods=['GET','POST'])
-def activities():
-    if 'user_id' not in session:
-        return redirect('/login')
-
-    db = get_db()
-    cur = db.cursor()
-    user_id = session['user_id']
-
-    if request.method == 'POST':
-        cur.execute("INSERT INTO activities(activity_name,done_by,date,description,user_id) VALUES(%s,%s,%s,%s,%s)",
-                    (request.form['activity_name'], request.form['done_by'], request.form['date'], request.form['description'], user_id))
-        db.commit()
-        return redirect('/activities')
-
-    cur.execute("SELECT * FROM activities WHERE user_id=%s", (user_id,))
-    rows = cur.fetchall()
-
-    table = "".join(f"<tr><td>{r['activity_name']}</td><td>{r['date']}</td><td>{r['description']}</td></tr>" for r in rows)
-
-    return f"""
-    <div style="font-family:Arial;padding:20px">
-    <h2>📋 Activities</h2>
-
-    <form method="POST">
-        <input name="activity_name" placeholder="Name"><br>
-        <input name="done_by" placeholder="Done by"><br>
-        <input type="date" name="date"><br>
-        <input name="description" placeholder="Description"><br>
-        <button>Save</button>
-    </form>
-
-    <table border="1" cellpadding="8">
-    <tr><th>Name</th><th>Date</th><th>Description</th></tr>
-    {table}
-    </table>
-
-    <a href="/dashboard">Back</a>
-    </div>
-    """
-
+    cur
 
 if __name__ == "__main__":
     app.run(debug=True)
