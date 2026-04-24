@@ -375,10 +375,10 @@ def expenses():
         return redirect('/expenses')
 
     cur.execute("SELECT * FROM expenses WHERE deleted=0 ORDER BY id DESC")
-rows = cur.fetchall()
+    rows = cur.fetchall()
 
-table = ""
-for r in rows:
+    table = ""
+    for r in rows:
     table += f"""
     <tr>
     <td>{r['amount']}</td>
@@ -390,11 +390,11 @@ for r in rows:
     </tr>
     """
 
-return f"""
-<h2>💸 Expenses</h2>
-<table>{table}</table>
-<a href='/dashboard'>Back</a>
-"""
+    return f"""
+    <h2>💸 Expenses</h2>
+    <table>{table}</table>
+    <a href='/dashboard'>Back</a>
+    """
 
 
 # ---------- ACTIVITIES ----------
