@@ -22,55 +22,130 @@ def get_db():
     )
 
 
-# ================= INIT DB =================
+# ================= INIT DB (PRO VERSION SAFE) =================
 @app.route("/initdb")
 def init_db():
     db = get_db()
     cur = db.cursor()
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS users(
+    # ================= USERS =================
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users(
         id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(100),
-        password VARCHAR(255)
-    )""")
+        username VARCHAR(100) UNIQUE,
+        password VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS income(
+    # ================= INCOME =================
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS income(
         id INT AUTO_INCREMENT PRIMARY KEY,
         amount DECIMAL(10,2),
         source VARCHAR(255),
         date DATE,
-        note TEXT,
+        description TEXT,
+        done_by VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'approved',
         user_id INT,
-        deleted INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )""")
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """)
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS expenses(
+    # ================= EXPENSES =================
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS expenses(
         id INT AUTO_INCREMENT PRIMARY KEY,
         amount DECIMAL(10,2),
         category VARCHAR(255),
         date DATE,
-        note TEXT,
+        description TEXT,
+        done_by VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'approved',
         user_id INT,
-        deleted INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )""")
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """)
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS activities(
+    # ================= ACTIVITIES =================
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS activities(
         id INT AUTO_INCREMENT PRIMARY KEY,
         activity_name VARCHAR(255),
         done_by VARCHAR(255),
         date DATE,
         description TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
         user_id INT,
-        deleted INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )""")
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ================= INDEXES =================
+    try:
+        cur.execute("CREATE INDEX idx_income_user ON income(user_id)")
+    except:
+        pass
+
+    try:
+        cur.execute("CREATE INDEX idx_expenses_user ON expenses(user_id)")
+    except:
+        pass
+
+    try:
+        cur.execute("CREATE INDEX idx_activities_user ON activities(user_id)")
+    except:
+        pass
+
+    # ================= AUTO FIX (SAFE FOR OLD DB) =================
+
+    # INCOME
+    for q in [
+        "ALTER TABLE income ADD COLUMN description TEXT",
+        "ALTER TABLE income ADD COLUMN done_by VARCHAR(100)",
+        "ALTER TABLE income ADD COLUMN status VARCHAR(50) DEFAULT 'approved'",
+        "ALTER TABLE income ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE income ADD COLUMN updated_at TIMESTAMP NULL"
+    ]:
+        try:
+            cur.execute(q)
+        except:
+            pass
+
+    # EXPENSES
+    for q in [
+        "ALTER TABLE expenses ADD COLUMN description TEXT",
+        "ALTER TABLE expenses ADD COLUMN done_by VARCHAR(100)",
+        "ALTER TABLE expenses ADD COLUMN status VARCHAR(50) DEFAULT 'approved'",
+        "ALTER TABLE expenses ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP NULL"
+    ]:
+        try:
+            cur.execute(q)
+        except:
+            pass
+
+    # ACTIVITIES
+    for q in [
+        "ALTER TABLE activities ADD COLUMN description TEXT",
+        "ALTER TABLE activities ADD COLUMN status VARCHAR(50) DEFAULT 'pending'",
+        "ALTER TABLE activities ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE activities ADD COLUMN updated_at TIMESTAMP NULL"
+    ]:
+        try:
+            cur.execute(q)
+        except:
+            pass
 
     db.commit()
-    return "DB READY"
-
-
+    return "🚀 PRO DATABASE READY (SAFE MODE) ✅"
 # ================= LOGIN =================
 @app.route("/login", methods=["GET","POST"])
 def login():
