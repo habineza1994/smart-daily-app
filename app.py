@@ -376,9 +376,8 @@ def expenses():
 
     cur.execute("SELECT * FROM expenses WHERE deleted=0 ORDER BY id DESC")
     rows = cur.fetchall()
-
-    table = ""
-    for r in rows:
+table = ""
+for r in rows:
     table += f"""
     <tr>
     <td>{r['amount']}</td>
@@ -390,7 +389,7 @@ def expenses():
     </tr>
     """
 
-    return f"""
+return f"""
     <h2>💸 Expenses</h2>
     <table>{table}</table>
     <a href='/dashboard'>Back</a>
