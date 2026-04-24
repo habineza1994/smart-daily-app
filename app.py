@@ -1,6 +1,9 @@
 import os
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 from ai_engine import analyze_finance
 import datetime
 >>>>>>> Stashed changes
@@ -478,6 +481,34 @@ def ai_advice():
     summary, advice = analyze_finance(incomes, expenses)
 
     return f"""
+<<<<<<< Updated upstream
+=======
+    <h2>SERVER ERROR</h2>
+    <pre>{e}</pre>
+    """, 500
+
+@app.route('/ai_advice')
+def ai_advice():
+    if 'user_id' not in session:
+        return redirect('/')
+
+    conn = get_db()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+    # Fata incomes
+    cursor.execute("SELECT amount FROM income WHERE user_id=%s", (session['user_id'],))
+    incomes = cursor.fetchall()
+
+    # Fata expenses
+    cursor.execute("SELECT amount FROM expenses WHERE user_id=%s", (session['user_id'],))
+    expenses = cursor.fetchall()
+
+    conn.close()
+
+    summary, advice = analyze_finance(incomes, expenses)
+
+    return f"""
+>>>>>>> Stashed changes
     <h2>🧠 AI Financial Advisor</h2>
     <pre>{summary}</pre>
     <h3>Advice:</h3>
