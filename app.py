@@ -297,35 +297,47 @@ def income():
     rows = cur.fetchall()
 
     table = ""
-    for r in rows:
-        table += f"""
-        <tr>
-        <td>{r['amount']}</td>
-        <td>{r['source']}</td>
-        <td>{r['date']}</td>
-        <td>{r['note']}</td>
-        <td>{r['created_at']}</td>
-        <td><a class='btn' href='?delete={r["id"]}'>Delete</a></td>
-        </tr>
-        """
-
-    return f"""
-    {STYLE}
-    <h2>💰 Income</h2>
-    <a class='btn' href='/income_pdf'>PDF</a>
-    <form method='POST'>
-        <input name='amount' placeholder='Amount' required>
-        <input name='source' placeholder='Source' required>
-        <input type='date' name='date' required>
-        <input name='note' placeholder='Note'>
-        <button>Save</button>
-    </form>
-    <table>
-    <tr><th>Amount</th><th>Source</th><th>Date</th><th>Note</th><th>Created</th><th>Action</th></tr>
-    {table}
-    </table>
-    <a href='/dashboard'>Back</a>
+for r in rows:
+    table += f"""
+    <tr>
+    <td>{r['amount']}</td>
+    <td>{r['source']}</td>
+    <td>{r['date']}</td>
+    <td>{r['note']}</td>
+    <td>{r['created_at']}</td>
+    <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
+    </tr>
     """
+
+return f"""
+{STYLE}
+<h2>💰 Income</h2>
+<a class='btn' href='/income_pdf'>PDF</a>
+
+<form method='POST'>
+    <input name='amount' placeholder='Amount' required>
+    <input name='source' placeholder='Source' required>
+    <input type='date' name='date' required>
+    <input name='note' placeholder='Note'>
+    <button>Save</button>
+</form>
+
+<table>
+<tr>
+<th>Amount</th>
+<th>Source</th>
+<th>Date</th>
+<th>Note</th>
+<th>Created</th>
+<th>Action</th>
+</tr>
+
+{table}
+
+</table>
+
+<a href='/dashboard'>Back</a>
+"""
 
 # ---------- INCOME PDF ----------
 @app.route('/income_pdf')
