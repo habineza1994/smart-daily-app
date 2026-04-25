@@ -398,6 +398,89 @@ def income():
         <th>Date</th>
         <th>Description</th>
         <th>Action</th>
+@app.route("/income", methods=["GET", "POST"])
+def income():
+    db = get_db()
+    cur = db.cursor()
+
+    # ================= ADD / UPDATE =================
+    if request.method == "POST":
+        if request.form.get("id"):  # UPDATE
+            cur.execute("""
+                UPDATE income 
+                SET amount=%s, source=%s, date=%s, description=%s
+                WHERE id=%s
+            """, (
+                request.form['amount'],
+                request.form['source'],
+                request.form['date'],
+                request.form.get('description', ''),
+                request.form['id']
+            ))
+        else:  # ADD
+            cur.execute("""
+                INSERT INTO income (amount, source, date, description, done_by)
+                VALUES (%s,%s,%s,%s,%s)
+            """, (
+                request.form['amount'],
+                request.form['source'],
+                request.form['date'],
+                request.form.get('description',''),
+                session.get("username")
+            ))
+
+        db.commit()
+        return redirect("/income")
+
+    # ================= DELETE (SOFT) =================
+    if request.args.get("delete"):
+        cur.execute("""
+            UPDATE income SET deleted_at=NOW()
+            WHERE id=%s
+        """, (request.args.get("delete"),))
+        db.commit()
+        return redirect("/income")
+
+    # ================= EDIT FETCH =================
+    edit_data = None
+    if request.args.get("edit"):
+        cur.execute("SELECT * FROM income WHERE id=%s", (request.args.get("edit"),))
+        edit_data = cur.fetchone()
+
+        # FIX DATE FORMAT
+        if edit_data and edit_data['date']:
+            edit_data['date'] = str(edit_data['date'])
+
+    # ================= FETCH DATA =================
+    cur.execute("SELECT * FROM income WHERE deleted_at IS NULL ORDER BY id DESC")
+    data = cur.fetchall()
+
+    total = sum([float(r['amount']) for r in data])
+
+    # ================= FORM =================
+    html = f"""
+    <h2>💰 Income</h2>
+
+    <form method="POST">
+        <input type="hidden" name="id" value="{edit_data['id'] if edit_data else ''}">
+        
+        Amount: <input name="amount" value="{edit_data['amount'] if edit_data else ''}" required><br>
+        Source: <input name="source" value="{edit_data['source'] if edit_data else ''}" required><br>
+        Date: <input name="date" type="date" value="{edit_data['date'] if edit_data else ''}" required><br>
+        Description: <input name="description" value="{edit_data['description'] if edit_data else ''}"><br>
+        
+        <button>{'Update Income' if edit_data else 'Add Income'}</button>
+    </form>
+
+    <h3>Total: {total}</h3>
+
+    <table border="1">
+    <tr>
+        <th>Amount</th>
+        <th>Source</th>
+        <th>Date</th>
+        <th>Description</th>
+        <th>Action</th>
     </tr>
     """
 
@@ -408,10 +491,10 @@ def income():
             <td>{r['amount']}</td>
             <td>{r['source']}</td>
             <td>{r['date']}</td>
-            <td>{r.get('description','')}</td>
+            <td>{r['description'] if r['description'] else ''}</td>
             <td>
-                <a href="?edit={r['id']}">Edit</a> |
-                <a href="?delete={r['id']}">Delete</a>
+                <a href="/income?edit={r['id']}">Edit</a> |
+                <a href="/income?delete={r['id']}" onclick="return confirm('Delete this record?')">Delete</a>
             </td>
         </tr>
         """
