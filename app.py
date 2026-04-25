@@ -387,6 +387,11 @@ def income():
 
     return html
 
+@app.route('/expenses', methods=['GET','POST'])
+def expenses():
+    db = get_db()
+    cur = db.cursor()
+
     # ================= ADD =================
     if request.method == 'POST':
         cur.execute("""
@@ -431,7 +436,6 @@ def income():
         </tr>
         """
 
-    # ================= RETURN =================
     return f"""
     <h2>💸 Expenses</h2>
 
