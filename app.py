@@ -361,49 +361,84 @@ def income():
 """
 
 
-# ---------- EXPENSES ----------
 @app.route('/expenses', methods=['GET','POST'])
 def expenses():
     db = get_db()
     cur = db.cursor()
 
+    # ================= ADD =================
     if request.method == 'POST':
-        cur.execute("INSERT INTO expenses(amount,category,date,note) VALUES(%s,%s,%s,%s)",
-                    (request.form['amount'],request.form['category'],
-                     request.form['date'],request.form['note']))
+        cur.execute("""
+        INSERT INTO expenses(amount, category, date, description, done_by, user_id)
+        VALUES(%s,%s,%s,%s,%s,%s)
+        """, (
+            request.form['amount'],
+            request.form['category'],
+            request.form['date'],
+            request.form['description'],
+            session.get('username'),
+            session.get('user_id')
+        ))
         db.commit()
         return redirect('/expenses')
 
-    cur.execute("SELECT * FROM expenses WHERE deleted=0 ORDER BY id DESC")
-    rows = cur.fetchall()
-table = ""
-for r in rows:
-    table += f"""
-    <tr>
-    <td>{r['amount']}</td>
-    <td>{r['category']}</td>
-    <td>{r['date']}</td>
-    <td>{r['note']}</td>
-    <td>{r['created_at']}</td>
-    <td><a href="?delete={r['id']}">Delete</a></td>
-    </tr>
-    """
+    # ================= DELETE (SOFT) =================
+    if 'delete' in request.args:
+        cur.execute("UPDATE expenses SET deleted_at=NOW() WHERE id=%s", (request.args.get('delete'),))
+        db.commit()
+        return redirect('/expenses')
 
-return f"""
-<h2>💸 Expenses</h2>
-<table border="1">
-<tr>
-    <th>Amount</th>
-    <th>Category</th>
-    <th>Date</th>
-    <th>Note</th>
-    <th>Created</th>
-    <th>Action</th>
-</tr>
-{table}
-</table>
-<a href='/dashboard'>Back</a>
-"""
+    # ================= FETCH =================
+    cur.execute("SELECT * FROM expenses WHERE deleted_at IS NULL ORDER BY id DESC")
+    rows = cur.fetchall()
+
+    # ================= TABLE =================
+    table = ""
+    for r in rows:
+        table += f"""
+        <tr>
+            <td>{r['amount']}</td>
+            <td>{r['category']}</td>
+            <td>{r['date']}</td>
+            <td>{r['description']}</td>
+            <td>{r['done_by']}</td>
+            <td>{r['status']}</td>
+            <td>{r['created_at']}</td>
+            <td>
+                <a href='?delete={r['id']}'>Delete</a>
+            </td>
+        </tr>
+        """
+
+    # ================= RETURN =================
+    return f"""
+    <h2>💸 Expenses</h2>
+
+    <form method="POST">
+        <input name="amount" placeholder="Amount"><br>
+        <input name="category" placeholder="Category"><br>
+        <input name="date" type="date"><br>
+        <input name="description" placeholder="Description"><br>
+        <button>Add</button>
+    </form>
+
+    <table border="1">
+        <tr>
+            <th>Amount</th>
+            <th>Category</th>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Done By</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Action</th>
+        </tr>
+        {table}
+    </table>
+
+    <br>
+    <a href='/dashboard'>Back</a>
+    """
 
 # ---------- ACTIVITIES ----------
 @app.route('/activities', methods=['GET','POST'])
