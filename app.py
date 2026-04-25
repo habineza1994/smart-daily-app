@@ -421,7 +421,7 @@ def income():
             <td>{r['amount']}</td>
             <td>{r['category']}</td>
             <td>{r['date']}</td>
-            <td>{r['description']}</td>
+            <td>{r.get('description','')}</td>
             <td>{r['done_by']}</td>
             <td>{r['status']}</td>
             <td>{r['created_at']}</td>
