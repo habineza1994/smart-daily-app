@@ -324,6 +324,273 @@ def income():
     db = get_db()
     cur = db.cursor()
 
+Nibyo rwose—that’s the next big upgrade 👍
+Reka nguhe table nziza cyane (professional) ukoreshe muri Flask yawe.
+
+🚀 1. Shyiramo Bootstrap (by’ingenzi)
+Muri HTML yawe (hejuru):
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+💎 2. Table nziza ya Income (copy paste)
+Iyi ni version isa neza cyane 👇
+
+return f"""
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="container mt-4">
+
+    <a href="/logout" class="btn btn-danger float-end">Logout</a>
+
+    <h2 class="mb-4">💰 Income</h2>
+
+    <table class="table table-striped table-hover shadow">
+        <thead class="table-dark">
+            <tr>
+                <th>#</th>
+                <th>Amount</th>
+                <th>Source</th>
+                <th>Date</th>
+                <th>Note</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+"""
++ "".join([
+    f"""
+    <tr>
+        <td>{i+1}</td>
+        <td><strong>{r['amount']}</strong></td>
+        <td>{r['source']}</td>
+        <td>{r['date']}</td>
+        <td>{r['note']}</td>
+        <td>
+            <a href="/income?edit={r['id']}" class="btn btn-sm btn-warning">Edit</a>
+            <a href="/income?delete={r['id']}" class="btn btn-sm btn-danger">Delete</a>
+        </td>
+    </tr>
+    """
+    for i, r in enumerate(rows)
+]) + """
+        </tbody>
+    </table>
+
+</div>
+"""
+✨ Ibyo iyi table iguha
+✔️ Colors nziza (dark header)
+
+✔️ Hover effect
+
+✔️ Buttons nziza (Edit/Delete)
+
+✔️ Responsive kuri phone 📱
+
+✔️ Professional look
+
+🔥 3. Ongera form nziza hejuru
+Shyira hejuru ya table:
+
+<div class="card p-3 mb-4 shadow">
+    <h5>Add Income</h5>
+    <form method="POST" class="row g-2">
+        <div class="col-md-3">
+            <input name="amount" class="form-control" placeholder="Amount">
+        </div>
+        <div class="col-md-3">
+            <input name="source" class="form-control" placeholder="Source">
+        </div>
+        <div class="col-md-3">
+            <input type="date" name="date" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <input name="note" class="form-control" placeholder="Note">
+        </div>
+        <div class="col-12">
+            <button class="btn btn-success">Save</button>
+        </div>
+    </form>
+</div>
+🎯 Result
+App yawe ihita isa nka:
+
+finance app nyayo 💰
+
+dashboard clean 🧼
+
+ikoreshwa neza kuri mobile 📱
+
+💡 Inama ikomeye
+👉 Niba ushaka level next:
+
+gukoresha templates (income.html) aho gukoresha return f"""
+
+cyangwa kongeramo icons & charts
+
+🚀 Ushaka next?
+Mbwira:
+👉 “nkore dashboard yose isa nka app”
+
+nguhe full UI (Income + Expenses + Activity) isa nka app ya bank 💯
+
+
+Nyobora gahoro 
+
+Ni sawa, reka tugende gahoro gahoro cyane kugeza ubonye table nziza ikora neza 👍
+
+🟢 INTAMBWE YA 1: Shyiramo Bootstrap
+Fungura app.py muri Termux
+
+nano app.py
+👉 Shaka aho ufite:
+
+return f"""
+👉 Uhite wongeraho uyu murongo hejuru:
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+🟢 INTAMBWE YA 2: Table yoroshye (tangirira hano)
+Siba table ya kera ushyire iyi:
+
+table = "".join([
+    f"<tr><td>{r['amount']}</td><td>{r['source']}</td><td>{r['date']}</td></tr>"
+    for r in rows
+])
+🟢 INTAMBWE YA 3: Shyira HTML nshya
+Mu return f""" shyiramo ibi:
+
+return f"""
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="container mt-4">
+
+<h2>Income</h2>
+
+<table class="table table-bordered">
+    <tr>
+        <th>Amount</th>
+        <th>Source</th>
+        <th>Date</th>
+    </tr>
+
+    {table}
+
+</table>
+
+</div>
+"""
+🟢 INTAMBWE YA 4: Save
+Muri nano:
+
+CTRL + X
+Y
+ENTER
+🟢 INTAMBWE YA 5: Push kuri GitHub
+git add .
+git commit -m "add simple table"
+git push
+🟢 INTAMBWE YA 6: Reba kuri Railway
+👉 fungura link yawe urebe:
+
+table igaragara ✔️
+
+isa neza ✔️
+
+⚠️ Niba bibaye error
+👉 ohereza error yose
+👉 cyangwa ohereza code ya income()
+
+ndakosora vuba cyane
+
+🚀 INTAMBWE IKURIKIRA (nyuma y’ibi)
+Iyo ibi bikunze, tuzongeraho:
+
+buttons (Edit/Delete)
+
+form nziza
+
+colors nziza
+
+Tugende step by step 👣
+Mbwira uti: “byakunze” cyangwa ohereze ikibazo 👌
+
+
+Nabuze aho mbishyira
+
+Nibyo, ikibazo cyawe ni cyiza 👍 reka nkwereke aho nyirizina ubishyira muri app.py yawe.
+
+🔍 AHO UBISHYIRA NYIRIZINA
+Shaka function imeze gutya:
+
+@app.route('/income', methods=['GET','POST'])
+def income():
+👉 Hasi yayo uzabona ibintu nka:
+
+cur.execute("SELECT * FROM income ...")
+rows = cur.fetchall()
+🟢 INTAMBWE YA 1: Shyira table HANO
+👉 Nyuma ya rows = cur.fetchall() shyiraho:
+
+table = "".join([
+    f"<tr><td>{r['amount']}</td><td>{r['source']}</td><td>{r['date']}</td></tr>"
+    for r in rows
+])
+🟢 INTAMBWE YA 2: Shyira return f""" HANO
+👉 Hasi ya table = ... shyiraho:
+
+return f"""
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="container mt-4">
+
+<h2>Income</h2>
+
+<table class="table table-bordered">
+    <tr>
+        <th>Amount</th>
+        <th>Source</th>
+        <th>Date</th>
+    </tr>
+
+    {table}
+
+</table>
+
+</div>
+"""
+🔴 IKOSA UKWIRINDA (rikunze kuba)
+👉 Ntugashyire code:
+
+hejuru ya function ❌
+
+hanze ya def income() ❌
+
+👉 igomba kuba inside function gusa ✔️
+
+💡 Uko bigomba kumera muri make
+@app.route('/income')
+def income():
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("SELECT * FROM income")
+    rows = cur.fetchall()
+
+    # 👇 HANO
+    table = "".join([
+        f"<tr><td>{r['amount']}</td><td>{r['source']}</td><td>{r['date']}</td></tr>"
+        for r in rows
+    ])
+
+    # 👇 NA HANO
+    return f"""
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <h2>Income</h2>
+    <table class="table">
+    <tr><th>Amount</th><th>Source</th><th>Date</th></tr>
+    {table}
+    </table>
+    """
     # ================= ADD / UPDATE =================
     if request.method == "POST":
         if request.form.get("id"):  # UPDATE
