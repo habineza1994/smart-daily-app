@@ -319,46 +319,77 @@ a{{text-decoration:none;color:black}}
 """
 
 
-# ---------- INCOME ----------
 @app.route("/income", methods=["GET", "POST"])
 def income():
     db = get_db()
     cur = db.cursor()
 
-    # ADD INCOME
+    # ================= ADD / UPDATE =================
     if request.method == "POST":
-        amount = request.form['amount']
-        source = request.form['source']
-        date = request.form['date']
-        description = request.form.get('description', '')
-        done_by = "admin"
-
-        cur.execute("""
-            INSERT INTO income (amount, source, date, description, done_by)
-            VALUES (%s,%s,%s,%s,%s)
-        """, (amount, source, date, description, done_by))
+        if request.form.get("id"):  # UPDATE
+            cur.execute("""
+                UPDATE income 
+                SET amount=%s, source=%s, date=%s, description=%s
+                WHERE id=%s
+            """, (
+                request.form['amount'],
+                request.form['source'],
+                request.form['date'],
+                request.form['description'],
+                request.form['id']
+            ))
+        else:  # ADD
+            cur.execute("""
+                INSERT INTO income (amount, source, date, description, done_by)
+                VALUES (%s,%s,%s,%s,%s)
+            """, (
+                request.form['amount'],
+                request.form['source'],
+                request.form['date'],
+                request.form.get('description',''),
+                session.get("username")
+            ))
 
         db.commit()
+        return redirect("/income")
 
-    # FETCH DATA
+    # ================= DELETE (SOFT) =================
+    if request.args.get("delete"):
+        cur.execute("""
+            UPDATE income SET deleted_at=NOW()
+            WHERE id=%s
+        """, (request.args.get("delete"),))
+        db.commit()
+        return redirect("/income")
+
+    # ================= EDIT FETCH =================
+    edit_data = None
+    if request.args.get("edit"):
+        cur.execute("SELECT * FROM income WHERE id=%s", (request.args.get("edit"),))
+        edit_data = cur.fetchone()
+
+    # ================= FETCH DATA =================
     cur.execute("SELECT * FROM income WHERE deleted_at IS NULL ORDER BY id DESC")
     data = cur.fetchall()
 
     total = sum([float(r['amount']) for r in data])
 
-    # HTML
-    html = """
+    # ================= FORM =================
+    html = f"""
     <h2>💰 Income</h2>
 
     <form method="POST">
-        Amount: <input name="amount"><br>
-        Source: <input name="source"><br>
-        Date: <input name="date" type="date"><br>
-        Description: <input name="description"><br>
-        <button>Add</button>
+        <input type="hidden" name="id" value="{edit_data['id'] if edit_data else ''}">
+        
+        Amount: <input name="amount" value="{edit_data['amount'] if edit_data else ''}"><br>
+        Source: <input name="source" value="{edit_data['source'] if edit_data else ''}"><br>
+        Date: <input name="date" type="date" value="{edit_data['date'] if edit_data else ''}"><br>
+        Description: <input name="description" value="{edit_data.get('description','') if edit_data else ''}"><br>
+        
+        <button>{'Update' if edit_data else 'Add'}</button>
     </form>
 
-    <h3>Total: {} </h3>
+    <h3>Total: {total}</h3>
 
     <table border="1">
     <tr>
@@ -368,8 +399,9 @@ def income():
         <th>Description</th>
         <th>Action</th>
     </tr>
-    """.format(total)
+    """
 
+    # ================= TABLE =================
     for r in data:
         html += f"""
         <tr>
@@ -378,15 +410,15 @@ def income():
             <td>{r['date']}</td>
             <td>{r.get('description','')}</td>
             <td>
-                <a href="/delete_income/{r['id']}">Delete</a>
+                <a href="?edit={r['id']}">Edit</a> |
+                <a href="?delete={r['id']}">Delete</a>
             </td>
         </tr>
         """
 
-    html += "</table><br><a href='/'>Back</a>"
+    html += "</table><br><a href='/dashboard'>Back</a>"
 
     return html
-
 @app.route('/expenses', methods=['GET','POST'])
 def expenses():
     db = get_db()
