@@ -385,16 +385,25 @@ for r in rows:
     <td>{r['date']}</td>
     <td>{r['note']}</td>
     <td>{r['created_at']}</td>
-    <td><a href='?delete={r['id']}'>Delete</a></td>
+    <td><a href="?delete={r['id']}">Delete</a></td>
     </tr>
     """
 
 return f"""
-    <h2>💸 Expenses</h2>
-    <table>{table}</table>
-    <a href='/dashboard'>Back</a>
-    """
-
+<h2>💸 Expenses</h2>
+<table border="1">
+<tr>
+    <th>Amount</th>
+    <th>Category</th>
+    <th>Date</th>
+    <th>Note</th>
+    <th>Created</th>
+    <th>Action</th>
+</tr>
+{table}
+</table>
+<a href='/dashboard'>Back</a>
+"""
 
 # ---------- ACTIVITIES ----------
 @app.route('/activities', methods=['GET','POST'])
