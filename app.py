@@ -320,51 +320,72 @@ a{{text-decoration:none;color:black}}
 
 
 # ---------- INCOME ----------
-@app.route('/income', methods=['GET','POST'])
+@app.route("/income", methods=["GET", "POST"])
 def income():
     db = get_db()
     cur = db.cursor()
 
-    if request.method == 'POST':
-        cur.execute("INSERT INTO income(amount,source,date,note) VALUES(%s,%s,%s,%s)",
-                    (request.form['amount'],request.form['source'],
-                     request.form['date'],request.form['note']))
-        db.commit()
-        return redirect('/income')
+    # ADD INCOME
+    if request.method == "POST":
+        amount = request.form['amount']
+        source = request.form['source']
+        date = request.form['date']
+        description = request.form.get('description', '')
+        done_by = "admin"
 
-    delete_id = request.args.get('delete')
-    if delete_id:
-        cur.execute("UPDATE income SET deleted=1 WHERE id=%s",(delete_id,))
-        db.commit()
-        return redirect('/income')
+        cur.execute("""
+            INSERT INTO income (amount, source, date, description, done_by)
+            VALUES (%s,%s,%s,%s,%s)
+        """, (amount, source, date, description, done_by))
 
+        db.commit()
+
+    # FETCH DATA
     cur.execute("SELECT * FROM income WHERE deleted_at IS NULL ORDER BY id DESC")
-    rows = cur.fetchall()
+    data = cur.fetchall()
 
-    table = ""
-    for r in rows:
-        table += f"""
+    total = sum([float(r['amount']) for r in data])
+
+    # HTML
+    html = """
+    <h2>💰 Income</h2>
+
+    <form method="POST">
+        Amount: <input name="amount"><br>
+        Source: <input name="source"><br>
+        Date: <input name="date" type="date"><br>
+        Description: <input name="description"><br>
+        <button>Add</button>
+    </form>
+
+    <h3>Total: {} </h3>
+
+    <table border="1">
+    <tr>
+        <th>Amount</th>
+        <th>Source</th>
+        <th>Date</th>
+        <th>Description</th>
+        <th>Action</th>
+    </tr>
+    """.format(total)
+
+    for r in data:
+        html += f"""
         <tr>
-        <td>{r['amount']}</td>
-        <td>{r['source']}</td>
-        <td>{r['date']}</td>
-        <td>{r['note']}</td>
-        <td>{r['created_at']}</td>
-        <td><a class='btn' href='?delete={r['id']}'>Delete</a></td>
+            <td>{r['amount']}</td>
+            <td>{r['source']}</td>
+            <td>{r['date']}</td>
+            <td>{r.get('description','')}</td>
+            <td>
+                <a href="/delete_income/{r['id']}">Delete</a>
+            </td>
         </tr>
         """
 
-    return f"""
-<h2>💰 Income</h2>
-<table>{table}</table>
-<a href='/dashboard'>Back</a>
-"""
+    html += "</table><br><a href='/'>Back</a>"
 
-
-@app.route('/expenses', methods=['GET','POST'])
-def expenses():
-    db = get_db()
-    cur = db.cursor()
+    return html
 
     # ================= ADD =================
     if request.method == 'POST':
