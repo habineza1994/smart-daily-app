@@ -338,7 +338,7 @@ def income():
         db.commit()
         return redirect('/income')
 
-    cur.execute("SELECT * FROM income WHERE deleted=0 ORDER BY id DESC")
+    cur.execute("SELECT * FROM income WHERE deleted_at IS NULL ORDER BY id DESC")
     rows = cur.fetchall()
 
     table = ""
