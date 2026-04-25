@@ -498,23 +498,122 @@ def expenses():
     """
 
 # ---------- ACTIVITIES ----------
-@app.route('/activities', methods=['GET','POST'])
-def activities():
-    if 'user_id' not in session:
-        return redirect('/login')
-
+@app.route("/activity", methods=["GET", "POST"])
+def activity():
     db = get_db()
     cur = db.cursor()
 
-    if request.method == 'POST':
-        cur.execute("INSERT INTO activities(activity_name,done_by,date,description) VALUES(%s,%s,%s,%s)",
-                    (request.form['name'],request.form['done_by'],
-                     request.form['date'],request.form['description']))
+    # ================= ADD / UPDATE =================
+    if request.method == "POST":
+        if request.form.get("id"):  # UPDATE
+            cur.execute("""
+                UPDATE activity 
+                SET title=%s, description=%s, status=%s, date=%s
+                WHERE id=%s
+            """, (
+                request.form['title'],
+                request.form.get('description',''),
+                request.form['status'],
+                request.form['date'],
+                request.form['id']
+            ))
+        else:  # ADD
+            cur.execute("""
+                INSERT INTO activity (title, description, status, date, done_by, user_id)
+                VALUES (%s,%s,%s,%s,%s,%s)
+            """, (
+                request.form['title'],
+                request.form.get('description',''),
+                request.form['status'],
+                request.form['date'],
+                session.get("username"),
+                session.get("user_id")
+            ))
+
         db.commit()
-        return redirect('/activities')
+        return redirect("/activity")
 
-    return "Activities Page"
+    # ================= DELETE (SOFT) =================
+    if request.args.get("delete"):
+        cur.execute("""
+            UPDATE activity SET deleted_at=NOW()
+            WHERE id=%s
+        """, (request.args.get("delete"),))
+        db.commit()
+        return redirect("/activity")
 
+    # ================= EDIT FETCH =================
+    edit_data = None
+    if request.args.get("edit"):
+        cur.execute("SELECT * FROM activity WHERE id=%s", (request.args.get("edit"),))
+        edit_data = cur.fetchone()
+
+    # ================= FETCH DATA =================
+    cur.execute("""
+        SELECT * FROM activity 
+        WHERE deleted_at IS NULL 
+        ORDER BY id DESC
+    """)
+    data = cur.fetchall()
+
+    total = len(data)
+
+    # ================= FORM =================
+    html = f"""
+    <h2>📋 Activity</h2>
+
+    <form method="POST">
+        <input type="hidden" name="id" value="{edit_data['id'] if edit_data else ''}">
+        
+        Title: <input name="title" value="{edit_data['title'] if edit_data else ''}"><br>
+        
+        Description: <input name="description" value="{edit_data.get('description','') if edit_data else ''}"><br>
+        
+        Status:
+        <select name="status">
+            <option value="pending" {'selected' if edit_data and edit_data['status']=='pending' else ''}>Pending</option>
+            <option value="done" {'selected' if edit_data and edit_data['status']=='done' else ''}>Done</option>
+        </select><br>
+
+        Date: <input type="date" name="date" value="{edit_data['date'] if edit_data else ''}"><br>
+        
+        <button>{'Update' if edit_data else 'Add'}</button>
+    </form>
+
+    <h3>Total Activities: {total}</h3>
+
+    <table border="1">
+    <tr>
+        <th>Title</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Done By</th>
+        <th>Created</th>
+        <th>Action</th>
+    </tr>
+    """
+
+    # ================= TABLE =================
+    for r in data:
+        html += f"""
+        <tr>
+            <td>{r['title']}</td>
+            <td>{r.get('description','')}</td>
+            <td>{r['status']}</td>
+            <td>{r['date']}</td>
+            <td>{r['done_by']}</td>
+            <td>{r['created_at']}</td>
+            <td>
+                <a href="?edit={r['id']}">Edit</a> |
+                <a href="?delete={r['id']}">Delete</a>
+            </td>
+        </tr>
+        """
+
+    html += "</table><br><a href='/dashboard'>Back</a>"
+
+    return html
 
 # ---------- AI ----------
 @app.route('/ai_advice')
