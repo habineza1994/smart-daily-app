@@ -488,7 +488,7 @@ def expenses():
             <th>Category</th>
             <th>Date</th>
             <th>Description</th>
-            <th>Done By</th>
+            r.get('done_by','')
             <th>Status</th>
             <th>Created</th>
             <th>Action</th>
