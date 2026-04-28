@@ -396,13 +396,13 @@ def income():
     <h3>Total: {total}</h3>
 
     <table border="1">
-    <tr>
-        <th>Amount</th>
-        <th>Source</th>
-        <th>Date</th>
-        <td>{r.get('description','')}</td>
-        <th>Action</th>
-    </tr>
+<tr>
+    <th>Amount</th>
+    <th>Source</th>
+    <th>Date</th>
+    <th>Description</th>
+    <th>Action</th>
+</tr>
     """
 
     # ================= TABLE =================
@@ -412,8 +412,7 @@ def income():
             <td>{r['amount']}</td>
             <td>{r['source']}</td>
             <td>{r['date']}</td>
-            <td>{r['description'] if r['description'] else ''}</td>
-            <td>
+            <td>{r.get('description','')}</td>
                 <a href="/income?edit={r['id']}">Edit</a> |
                 <a href="/income?delete={r['id']}" onclick="return confirm('Delete this record?')">Delete</a>
             </td>
