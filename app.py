@@ -400,7 +400,7 @@ def income():
         <th>Amount</th>
         <th>Source</th>
         <th>Date</th>
-        <th>Description</th>
+        <td>{r.get('description','')}</td>
         <th>Action</th>
     </tr>
     """
@@ -463,7 +463,7 @@ def expenses():
             <td>{r['category']}</td>
             <td>{r['date']}</td>
             <td>{r.get('description','')}</td>
-            <td>{r['done_by']}</td>
+            <td>{r.get('done_by','')}</td>
             <td>{r['status']}</td>
             <td>{r['created_at']}</td>
             <td>
