@@ -389,23 +389,139 @@ def income():
         Source: <input name="source" value="{edit_data['source'] if edit_data else ''}" required><br>
         Date: <input name="date" type="date" value="{edit_data['date'] if edit_data else ''}" required><br>
         Description: <input name="description" value="{edit_data['description'] if edit_data else ''}"><br>
-        
-        <button>{'Update Income' if edit_data else 'Add Income'}</button>
-    </form>
+@app.route("/income", methods=["GET", "POST"])
+def income():
+    db = get_db()
+    cur = db.cursor()
 
+    # ================= ADD / UPDATE =================
+    if request.method == "POST":
+        try:
+            amount = request.form['amount']
+            source = request.form['source']
+            date = request.form['date']
+            description = request.form.get('description', '')
+
+            if request.form.get("id"):  # UPDATE
+                cur.execute("""
+                    UPDATE income 
+                    SET amount=%s, source=%s, date=%s, description=%s
+                    WHERE id=%s
+                """, (amount, source, date, description, request.form['id']))
+            else:  # ADD
+                cur.execute("""
+                    INSERT INTO income (amount, source, date, description, done_by)
+                    VALUES (%s,%s,%s,%s,%s)
+                """, (amount, source, date, description, session.get("username", "admin")))
+
+            db.commit()
+        except Exception as e:
+            return f"ERROR: {e}"
+
+        return redirect("/income")
+
+    # ================= DELETE =================
+    if request.args.get("delete"):
+        try:
+            cur.execute("UPDATE income SET deleted_at=NOW() WHERE id=%s",
+                        (request.args.get("delete"),))
+            db.commit()
+        except Exception as e:
+            return f"ERROR: {e}"
+
+        return redirect("/income")
+
+    # ================= EDIT =================
+    edit_data = None
+    if request.args.get("edit"):
+        cur.execute("SELECT * FROM income WHERE id=%s", (request.args.get("edit"),))
+        edit_data = cur.fetchone()
+
+        if edit_data and edit_data['date']:
+            edit_data['date'] = edit_data['date'].strftime("%Y-%m-%d")
+
+    # ================= FETCH =================
+    cur.execute("SELECT * FROM income WHERE deleted_at IS NULL ORDER BY id DESC")
+    data = cur.fetchall()
+
+    total = sum(float(r['amount']) for r in data)
+
+    # ================= HTML DESIGN =================
+    html = f"""
+    <html>
+    <head>
+        <title>Income</title>
+        <style>
+            body {{
+                font-family: Arial;
+                background: #f4f6f9;
+                padding: 20px;
+            }}
+            .card {{
+                background: white;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin-bottom: 20px;
+            }}
+            input, button {{
+                padding: 8px;
+                margin: 5px;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                background: white;
+            }}
+            th, td {{
+                padding: 10px;
+                border-bottom: 1px solid #ddd;
+                text-align: left;
+            }}
+            th {{
+                background: #333;
+                color: white;
+            }}
+            .btn {{
+                padding: 5px 10px;
+                border-radius: 5px;
+                text-decoration: none;
+            }}
+            .edit {{ background: orange; color: white; }}
+            .delete {{ background: red; color: white; }}
+        </style>
+    </head>
+
+    <body>
+
+    <h2>💰 Income Management</h2>
+
+    <div class="card">
+    <form method="POST">
+        <input type="hidden" name="id" value="{edit_data['id'] if edit_data else ''}">
+
+        <input name="amount" placeholder="Amount" value="{edit_data['amount'] if edit_data else ''}" required>
+        <input name="source" placeholder="Source" value="{edit_data['source'] if edit_data else ''}" required>
+        <input type="date" name="date" value="{edit_data['date'] if edit_data else ''}" required>
+        <input name="description" placeholder="Description" value="{edit_data['description'] if edit_data else ''}">
+
+        <button>{'Update' if edit_data else 'Add'}</button>
+    </form>
+    </div>
+
+    <div class="card">
     <h3>Total: {total}</h3>
 
-    <table border="1">
-<tr>
-    <th>Amount</th>
-    <th>Source</th>
-    <th>Date</th>
-    <th>Description</th>
-    <th>Action</th>
-</tr>
+    <table>
+        <tr>
+            <th>Amount</th>
+            <th>Source</th>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Action</th>
+        </tr>
     """
 
-    # ================= TABLE =================
     for r in data:
         html += f"""
         <tr>
@@ -413,13 +529,22 @@ def income():
             <td>{r['source']}</td>
             <td>{r['date']}</td>
             <td>{r.get('description','')}</td>
-                <a href="/income?edit={r['id']}">Edit</a> |
-                <a href="/income?delete={r['id']}" onclick="return confirm('Delete this record?')">Delete</a>
+            <td>
+                <a class="btn edit" href="/income?edit={r['id']}">Edit</a>
+                <a class="btn delete" href="/income?delete={r['id']}" onclick="return confirm('Delete?')">Delete</a>
             </td>
         </tr>
         """
 
-    html += "</table><br><a href='/dashboard'>Back</a>"
+    html += """
+    </table>
+    </div>
+
+    <a href="/dashboard">⬅ Back</a>
+
+    </body>
+    </html>
+    """
 
     return html
 @app.route('/expenses', methods=['GET','POST'])
