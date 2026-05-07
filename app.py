@@ -491,35 +491,111 @@ def income():
             .delete {{ background: red; color: white; }}
         </style>
     </head>
+@app.route("/income", methods=["GET", "POST"])
+def income():
+    db = get_db()
+    cur = db.cursor()
+
+    # ================= DELETE =================
+    delete_id = request.args.get("delete")
+    if delete_id:
+        cur.execute("DELETE FROM income WHERE id=%s", (delete_id,))
+        db.commit()
+        return redirect("/income")
+
+    # ================= EDIT DATA =================
+    edit_id = request.args.get("edit")
+    edit_data = None
+
+    if edit_id:
+        cur.execute("SELECT * FROM income WHERE id=%s", (edit_id,))
+        edit_data = cur.fetchone()
+
+    # ================= ADD / UPDATE =================
+    if request.method == "POST":
+        income_id = request.form.get("id")
+        amount = request.form['amount']
+        source = request.form['source']
+        date = request.form['date']
+        description = request.form['description']
+
+        if income_id:
+            cur.execute("""
+                UPDATE income
+                SET amount=%s, source=%s, date=%s, description=%s
+                WHERE id=%s
+            """, (amount, source, date, description, income_id))
+        else:
+            cur.execute("""
+                INSERT INTO income(amount, source, date, description)
+                VALUES(%s, %s, %s, %s)
+            """, (amount, source, date, description))
+
+        db.commit()
+        return redirect("/income")
+
+    # ================= FETCH DATA =================
+    cur.execute("SELECT * FROM income ORDER BY id DESC")
+    data = cur.fetchall()
+
+    cur.execute("SELECT SUM(amount) as total FROM income")
+    total = cur.fetchone()['total'] or 0
+
+    # ================= SAFE EDIT VALUES =================
+    amount_val = edit_data['amount'] if edit_data else ""
+    source_val = edit_data['source'] if edit_data else ""
+    date_val = edit_data['date'] if edit_data else ""
+    desc_val = edit_data['description'] if edit_data else ""
+    edit_id_val = edit_data['id'] if edit_data else ""
+
+    # ================= HTML =================
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Income</title>
+        <style>
+            body {{ font-family: Arial; margin: 20px; background:#f4f4f4; }}
+            .card {{ background:white; padding:15px; margin-bottom:20px; border-radius:10px; }}
+            input {{ padding:8px; margin:5px; }}
+            button {{ padding:8px 12px; background:green; color:white; border:none; }}
+            table {{ width:100%; border-collapse:collapse; }}
+            th, td {{ border:1px solid #ddd; padding:8px; }}
+            th {{ background:#333; color:white; }}
+            .btn {{ padding:5px 10px; text-decoration:none; border-radius:5px; }}
+            .edit {{ background:orange; color:white; }}
+            .delete {{ background:red; color:white; }}
+        </style>
+    </head>
 
     <body>
 
     <h2>💰 Income Management</h2>
 
     <div class="card">
-    <form method="POST">
-        <input type="hidden" name="id" value="{edit_data['id'] if edit_data else ''}">
+        <form method="POST">
+            <input type="hidden" name="id" value="{edit_id_val}">
 
-        <input name="amount" placeholder="Amount" value="{edit_data['amount'] if edit_data else ''}" required>
-        <input name="source" placeholder="Source" value="{edit_data['source'] if edit_data else ''}" required>
-        <input type="date" name="date" value="{edit_data['date'] if edit_data else ''}" required>
-        <input name="description" placeholder="Description" value="{edit_data['description'] if edit_data else ''}">
+            <input name="amount" placeholder="Amount" value="{amount_val}" required>
+            <input name="source" placeholder="Source" value="{source_val}" required>
+            <input type="date" name="date" value="{date_val}" required>
+            <input name="description" placeholder="Description" value="{desc_val}">
 
-        <button>{'Update' if edit_data else 'Add'}</button>
-    </form>
+            <button type="submit">{'Update' if edit_data else 'Add'}</button>
+        </form>
     </div>
 
     <div class="card">
-    <h3>Total: {total}</h3>
+        <h3>Total: {total}</h3>
 
-    <table>
-        <tr>
-            <th>Amount</th>
-            <th>Source</th>
-            <th>Date</th>
-            <th>Description</th>
-            <th>Action</th>
-        </tr>
+        <table>
+            <tr>
+                <th>Amount</th>
+                <th>Source</th>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Action</th>
+            </tr>
     """
 
     for r in data:
@@ -537,7 +613,7 @@ def income():
         """
 
     html += """
-    </table>
+        </table>
     </div>
 
     <a href="/dashboard">⬅ Back</a>
