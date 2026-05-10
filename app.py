@@ -423,9 +423,11 @@ Balance<br>{balance}
 @app.route("/income", methods=["GET", "POST"])
 def income():
 
+    if 'user_id' not in session:
+        return redirect('/login')
+
     db = get_db()
     cur = db.cursor()
-
     # DELETE
     delete_id = request.args.get("delete")
 
