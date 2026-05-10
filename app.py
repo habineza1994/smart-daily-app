@@ -428,6 +428,7 @@ def income():
 
     db = get_db()
     cur = db.cursor()
+
     # DELETE
     delete_id = request.args.get("delete")
 
@@ -455,6 +456,19 @@ def income():
             date = request.form.get("date")
             description = request.form.get("description")
 
+            # VALIDATION
+            if not amount or not source:
+                return "Amount and Source are required ❌"
+
+            try:
+                amount = float(amount)
+            except:
+                return "Amount must be a number ❌"
+
+            if not date:
+                date = None
+
+            # UPDATE
             if income_id:
 
                 cur.execute("""
@@ -472,6 +486,7 @@ def income():
                     income_id
                 ))
 
+            # INSERT
             else:
 
                 cur.execute("""
@@ -500,20 +515,15 @@ def income():
             return f"ERROR: {str(e)}"
 
     # FETCH
-    cur.execute("""
-    SELECT * FROM income
-    ORDER BY id DESC
-    """)
+    cur.execute("SELECT * FROM income ORDER BY id DESC")
     data = cur.fetchall()
 
-    cur.execute("""
-    SELECT COALESCE(SUM(amount),0) AS total
-    FROM income
-    """)
+    cur.execute("SELECT COALESCE(SUM(amount),0) AS total FROM income")
     total = cur.fetchone()['total']
 
     db.close()
 
+    # EDIT VALUES
     amount_val = edit_data["amount"] if edit_data else ""
     source_val = edit_data["source"] if edit_data else ""
     date_val = edit_data["date"] if edit_data else ""
@@ -642,7 +652,6 @@ a[href*="delete"] {{
 
         html += f"""
 <tr>
-
 <td>{r['amount']}</td>
 <td>{r['source']}</td>
 <td>{r['date']}</td>
@@ -652,7 +661,6 @@ a[href*="delete"] {{
 <a href="/income?edit={r['id']}">Edit</a>
 <a href="/income?delete={r['id']}" onclick="return confirm('Delete this item?')">Delete</a>
 </td>
-
 </tr>
 """
 
