@@ -370,16 +370,16 @@ def income():
             return f"ERROR: {str(e)}"
 
     # ================= FETCH DATA =================
-    cur.execute("SELECT * FROM income ORDER BY id DESC")
-    data = cur.fetchall()
-    cur.execute("SELECT SUM(amount) FROM income")
-    total_row = cur.fetchone()
+cur.execute("SELECT * FROM income ORDER BY id DESC")
+data = cur.fetchall()
 
-    if total_row:
-    total = list(total_row.values())[0] or 0
-    else:
+cur.execute("SELECT SUM(amount) FROM income")
+total_row = cur.fetchone()
+
+if total_row and total_row[0] is not None:
+    total = total_row[0]
+else:
     total = 0
-
     # ================= SAFE EDIT VALUES =================
     amount_val = edit_data["amount"] if edit_data else ""
     source_val = edit_data["source"] if edit_data else ""
