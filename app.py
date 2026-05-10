@@ -368,8 +368,8 @@ def income():
 
         except Exception as e:
             return f"ERROR: {str(e)}"
+  return render_template("income.html")
 
-    return "GET income page"
     # ================= FETCH DATA =================
     cur.execute("SELECT * FROM income ORDER BY id DESC")
     data = cur.fetchall()
