@@ -1,7 +1,8 @@
 import os
 from ai_engine import analyze_finance
 import pymysql
-from flask import Flask, request, redirect, session
+from flask import Flask, request, redirect, session, send_file
+import io
 
 from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib.pagesizes import A4
@@ -21,6 +22,7 @@ def get_db():
         database=os.environ.get('MYSQLDATABASE'),
         cursorclass=pymysql.cursors.DictCursor
     )
+
 # ================= INIT DB =================
 @app.route("/initdb")
 def init_db():
