@@ -339,52 +339,61 @@ def income():
         edit_data = cur.fetchone()
 
     # ================= ADD / UPDATE =================
-if request.method == "POST":
-    try:
-        income_id = request.form.get("id")
-        amount = request.form['amount']
-        source = request.form['source']
-        date = request.form.get('date') or None
-        description = request.form['description']
 
-        if income_id:  # UPDATE
-            cur.execute("""
-                UPDATE income
-                SET amount = %s,
-                    source = %s,
-                    date = %s,
-                    description = %s
-                WHERE id = %s
-            """, (amount, source, date, description, income_id))
+    if request.method == "POST":
+        try:
+            income_id = request.form.get("id")
+            amount = request.form['amount']
+            source = request.form['source']
+            date = request.form.get('date') or None
+            description = request.form['description']
 
-        else:  # INSERT
-            cur.execute("""
-                INSERT INTO income (amount, source, date, description)
-                VALUES (%s, %s, %s, %s)
-            """, (amount, source, date, description))
+            if income_id:  # UPDATE
+                cur.execute("""
+                    UPDATE income
+                    SET amount=%s,
+                        source=%s,
+                        date=%s,
+                        description=%s
+                    WHERE id=%s
+                """, (amount, source, date, description, income_id))
 
-        db.commit()
-        return redirect("/income")
+            else:  # INSERT
+                cur.execute("""
+                    INSERT INTO income (amount, source, date, description)
+                    VALUES (%s, %s, %s, %s)
+                """, (amount, source, date, description))
 
-    except Exception as e:
-        return f"ERROR: {str(e)}"
+            db.commit()
+            return redirect("/income")
 
-return """
-<h2>Income Page is working 🎉</h2>
-"""
+        except Exception as e:
+            return f"ERROR: {str(e)}"
+
     # ================= FETCH DATA =================
     cur.execute("SELECT * FROM income ORDER BY id DESC")
     data = cur.fetchall()
 
     cur.execute("SELECT SUM(amount) as total FROM income")
-    total = cur.fetchone()['total'] or 0
+    total = cur.fetchone()["total"] or 0
 
     # ================= SAFE EDIT VALUES =================
-    amount_val = edit_data['amount'] if edit_data else ""
-    source_val = edit_data['source'] if edit_data else ""
-    date_val = edit_data['date'] if edit_data else ""
-    desc_val = edit_data['description'] if edit_data else ""
-    edit_id_val = edit_data['id'] if edit_data else ""
+    amount_val = edit_data["amount"] if edit_data else ""
+    source_val = edit_data["source"] if edit_data else ""
+    date_val = edit_data["date"] if edit_data else ""
+    desc_val = edit_data["description"] if edit_data else ""
+    edit_id_val = edit_data["id"] if edit_data else ""
+
+    return render_template(
+        "income.html",
+        data=data,
+        total=total,
+        amount_val=amount_val,
+        source_val=source_val,
+        date_val=date_val,
+        desc_val=desc_val,
+        edit_id_val=edit_id_val
+    )
 
     # ================= HTML =================
     html = f"""
