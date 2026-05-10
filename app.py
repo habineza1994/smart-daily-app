@@ -66,7 +66,285 @@ def init_db():
 
     return "🚀 DATABASE READY (FULL FIXED VERSION)"
 
+# ================= LOGIN =================
+@app.route("/login", methods=["GET", "POST"])
+def login():
 
+    if request.method == "POST":
+
+        db = get_db()
+        cur = db.cursor()
+
+        cur.execute(
+            "SELECT * FROM users WHERE username=%s",
+            (request.form['username'],)
+        )
+
+        user = cur.fetchone()
+        db.close()
+
+        # ❌ OLD: password comparison insecure removed
+        # ⚠️ NOTE: ideally use hashed password (we can upgrade later)
+
+        if user and user['password'] == request.form['password']:
+
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+
+            return redirect("/dashboard")
+
+        return "Login Failed ❌"
+
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:linear-gradient(120deg,#4e54c8,#8f94fb);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.card{
+    background:white;
+    width:92%;
+    max-width:420px;
+    padding:25px;
+    border-radius:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.15);
+}
+
+input{
+    width:100%;
+    padding:14px;
+    margin:10px 0;
+    border-radius:10px;
+    border:1px solid #ddd;
+}
+
+button{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#4e54c8;
+    color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h2 style="text-align:center;">HIRWA SMART</h2>
+
+<form method="POST">
+
+<input name="username" placeholder="Username" required>
+<input name="password" type="password" placeholder="Password" required>
+
+<button>Login</button>
+
+</form>
+
+</div>
+
+</body>
+</html>
+"""
+
+
+# ================= LOGOUT =================
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+# ================= DASHBOARD =================
+@app.route("/dashboard")
+def dashboard():
+
+    if 'user_id' not in session:
+        return redirect("/login")
+
+    user_id = session['user_id']
+
+    db = get_db()
+    cur = db.cursor()
+
+    filter_type = request.args.get('filter', 'all')
+
+    income_filter = ""
+    expense_filter = ""
+
+    if filter_type == "today":
+        income_filter = "AND DATE(date)=CURDATE()"
+        expense_filter = "AND DATE(date)=CURDATE()"
+
+    elif filter_type == "month":
+        income_filter = "AND MONTH(date)=MONTH(CURDATE())"
+        expense_filter = "AND MONTH(date)=MONTH(CURDATE())"
+
+    # ================= INCOME =================
+    cur.execute(
+        f"SELECT COALESCE(SUM(amount),0) AS total FROM income WHERE user_id=%s {income_filter}",
+        (user_id,)
+    )
+    income = float(cur.fetchone()['total'])
+
+    # ================= EXPENSES =================
+    cur.execute(
+        f"SELECT COALESCE(SUM(amount),0) AS total FROM expenses WHERE user_id=%s {expense_filter}",
+        (user_id,)
+    )
+    expenses = float(cur.fetchone()['total'])
+
+    balance = income - expenses
+
+    # ================= ACTIVITIES =================
+    cur.execute(
+        "SELECT COUNT(*) AS total FROM activities WHERE user_id=%s",
+        (user_id,)
+    )
+    act = cur.fetchone()['total']
+
+    db.close()
+
+    notif = "<div style='padding:10px;background:green;color:white;border-radius:8px'>System OK</div>"
+
+    if balance < 0:
+        notif = "<div style='padding:10px;background:red;color:white;border-radius:8px'>Low Balance Warning ⚠</div>"
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dashboard</title>
+
+<style>
+
+body{{
+margin:0;
+font-family:Arial;
+background:#f4f6fb;
+}}
+
+.header{{
+background:linear-gradient(90deg,#4e54c8,#8f94fb);
+color:white;
+padding:20px;
+text-align:center;
+font-size:22px;
+font-weight:bold;
+}}
+
+.card{{
+background:white;
+margin:15px;
+padding:18px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,0.08);
+}}
+
+.summary{{
+margin:15px;
+background:white;
+padding:15px;
+border-radius:15px;
+}}
+
+.box{{
+width:32%;
+padding:12px;
+border-radius:10px;
+color:white;
+text-align:center;
+}}
+
+.income-box{{ background:#28a745; }}
+.expense-box{{ background:#dc3545; }}
+.balance-box{{ background:#007bff; }}
+
+a{{
+text-decoration:none;
+color:black;
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">HIRWA SMART</div>
+
+{notif}
+
+<div class="card">
+
+<h3>Menu</h3>
+
+<a href="/income">💰 Income</a><br><br>
+<a href="/expenses">💸 Expenses</a><br><br>
+<a href="/activity">📋 Activities</a><br><br>
+<a href="/ai_advice">🧠 AI Advice</a><br><br>
+<a href="/logout">🚪 Logout</a>
+
+</div>
+
+<div class="card">
+
+<form method="GET">
+
+<select name="filter">
+<option value="all">All</option>
+<option value="today">Today</option>
+<option value="month">This Month</option>
+</select>
+
+<button>Filter</button>
+
+</form>
+
+</div>
+
+<div class="summary">
+
+<h3>Summary</h3>
+
+<div style="display:flex;justify-content:space-between">
+
+<div class="box income-box">
+Income<br>{income}
+</div>
+
+<div class="box expense-box">
+Expenses<br>{expenses}
+</div>
+
+<div class="box balance-box">
+Balance<br>{balance}
+</div>
+
+</div>
+
+<p>Activities: {act}</p>
+
+</div>
+
+</body>
+</html>
+"""
 # ================= PDF EXPORT =================
 @app.route("/income/pdf")
 def income_pdf():
