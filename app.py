@@ -339,35 +339,36 @@ def income():
         edit_data = cur.fetchone()
 
     # ================= ADD / UPDATE =================
-    if request.method == "POST":
-        try:
-            income_id = request.form.get("id")
-            amount = request.form['amount']
-            source = request.form['source']
-            date = request.form.get('date') or None
-            description = request.form['description']
+if request.method == "POST":
+    try:
+        income_id = request.form.get("id")
+        amount = request.form['amount']
+        source = request.form['source']
+        date = request.form.get('date') or None
+        description = request.form['description']
 
-            if income_id:  # UPDATE
-                cur.execute("""
-                    UPDATE income
-                    SET amount = %s,
-                        source = %s,
-                        date = %s,
-                        description = %s
-                    WHERE id = %s
-                """, (amount, source, date, description, income_id))
+        if income_id:  # UPDATE
+            cur.execute("""
+                UPDATE income
+                SET amount = %s,
+                    source = %s,
+                    date = %s,
+                    description = %s
+                WHERE id = %s
+            """, (amount, source, date, description, income_id))
 
-            else:  # INSERT
-                cur.execute("""
-                    INSERT INTO income (amount, source, date, description)
-                    VALUES (%s, %s, %s, %s)
-                """, (amount, source, date, description))
+        else:  # INSERT
+            cur.execute("""
+                INSERT INTO income (amount, source, date, description)
+                VALUES (%s, %s, %s, %s)
+            """, (amount, source, date, description))
 
-            db.commit()
-            return redirect("/income")
+        db.commit()
+        return redirect("/income")
 
-        except Exception as e:
-            return f"ERROR: {str(e)}"
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
 return """
 <h2>Income Page is working 🎉</h2>
 """
