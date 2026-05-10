@@ -330,7 +330,7 @@ def income():
         db.commit()
         return redirect("/income")
 
-    # ================= EDIT =================
+    # ================= EDIT DATA =================
     edit_id = request.args.get("edit")
     edit_data = None
 
@@ -342,10 +342,10 @@ def income():
     if request.method == "POST":
         try:
             income_id = request.form.get("id")
-            amount = request.form['amount']
-            source = request.form['source']
-            date = request.form.get('date') or None
-            description = request.form['description']
+            amount = request.form.get("amount")
+            source = request.form.get("source")
+            date = request.form.get("date") or None
+            description = request.form.get("description")
 
             if income_id:
                 cur.execute("""
@@ -356,6 +356,7 @@ def income():
                         description=%s
                     WHERE id=%s
                 """, (amount, source, date, description, income_id))
+
             else:
                 cur.execute("""
                     INSERT INTO income (amount, source, date, description)
@@ -374,9 +375,9 @@ def income():
 
     cur.execute("SELECT SUM(amount) FROM income")
     total_row = cur.fetchone()
-    total = total_row[0] if total_row and total_row[0] else 0
+    total = total_row[0] if total_row and total_row[0] is not None else 0
 
-    # ================= SAFE EDIT =================
+    # ================= SAFE EDIT VALUES =================
     amount_val = edit_data["amount"] if edit_data else ""
     source_val = edit_data["source"] if edit_data else ""
     date_val = edit_data["date"] if edit_data else ""
