@@ -1,11 +1,14 @@
+# ================= IMPORTS =================
 import os
-from ai_engine import analyze_finance
-import pymysql
-from flask import Flask, request, redirect, session, send_file
 import io
+import pymysql
+
+from flask import Flask, request, redirect, session, send_file
 
 from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib.pagesizes import A4
+
+from ai_engine import analyze_finance
 
 app = Flask(__name__)
 
@@ -23,9 +26,11 @@ def get_db():
         cursorclass=pymysql.cursors.DictCursor
     )
 
+
 # ================= INIT DB =================
 @app.route("/initdb")
 def init_db():
+
     db = get_db()
     cur = db.cursor()
 
@@ -56,370 +61,50 @@ def init_db():
     )
     """)
 
-    # EXPENSES
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS expenses(
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        amount DECIMAL(10,2),
-        category VARCHAR(255),
-        date DATE,
-        description TEXT,
-        done_by VARCHAR(100),
-        status VARCHAR(50) DEFAULT 'approved',
-        user_id INT,
-        deleted_at TIMESTAMP NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-    """)
-
-    # ACTIVITIES
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS activities(
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        activity_name VARCHAR(255),
-        done_by VARCHAR(255),
-        date DATE,
-        description TEXT,
-        status VARCHAR(50) DEFAULT 'pending',
-        user_id INT,
-        deleted_at TIMESTAMP NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-    """)
-
-    # ================= SAFE FIX (NO ERRORS ON OLD DB) =================
-    fixes = [
-        "ALTER TABLE income ADD COLUMN description TEXT",
-        "ALTER TABLE income ADD COLUMN done_by VARCHAR(100)",
-        "ALTER TABLE income ADD COLUMN status VARCHAR(50)",
-        "ALTER TABLE income ADD COLUMN deleted_at TIMESTAMP NULL",
-        "ALTER TABLE income ADD COLUMN updated_at TIMESTAMP NULL",
-
-        "ALTER TABLE expenses ADD COLUMN description TEXT",
-        "ALTER TABLE expenses ADD COLUMN done_by VARCHAR(100)",
-        "ALTER TABLE expenses ADD COLUMN status VARCHAR(50)",
-        "ALTER TABLE expenses ADD COLUMN deleted_at TIMESTAMP NULL",
-        "ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP NULL",
-
-        "ALTER TABLE activities ADD COLUMN description TEXT",
-        "ALTER TABLE activities ADD COLUMN done_by VARCHAR(100)",
-        "ALTER TABLE activities ADD COLUMN status VARCHAR(50)",
-        "ALTER TABLE activities ADD COLUMN deleted_at TIMESTAMP NULL",
-        "ALTER TABLE activities ADD COLUMN updated_at TIMESTAMP NULL",
-    ]
-
-    for q in fixes:
-        try:
-            cur.execute(q)
-        except:
-            pass
-
     db.commit()
     db.close()
 
     return "🚀 DATABASE READY (FULL FIXED VERSION)"
 
-# ================= LOGIN =================
-@app.route("/login", methods=["GET", "POST"])
-def login():
 
-    if request.method == "POST":
-
-        db = get_db()
-        cur = db.cursor()
-
-        cur.execute(
-            "SELECT * FROM users WHERE username=%s AND password=%s",
-            (request.form['username'], request.form['password'])
-        )
-
-        user = cur.fetchone()
-
-        db.close()
-
-        if user:
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-
-            return redirect("/dashboard")
-
-        return "Login Failed ❌"
-
-    return """
-<!DOCTYPE html>
-<html>
-<head>
-<title>HIRWA SMART Login</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<style>
-
-body{
-    margin:0;
-    font-family:Arial;
-    background:linear-gradient(120deg,#4e54c8,#8f94fb);
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-}
-
-.card{
-    background:white;
-    width:92%;
-    max-width:420px;
-    padding:25px;
-    border-radius:20px;
-    box-shadow:0 10px 25px rgba(0,0,0,0.15);
-}
-
-input{
-    width:100%;
-    padding:14px;
-    margin:10px 0;
-    border-radius:10px;
-    border:1px solid #ddd;
-}
-
-button{
-    width:100%;
-    padding:14px;
-    border:none;
-    border-radius:10px;
-    background:#4e54c8;
-    color:white;
-}
-
-</style>
-</head>
-
-<body>
-
-<div class="card">
-
-<h2 style="text-align:center;">HIRWA SMART</h2>
-
-<form method="POST">
-
-<input name="username" placeholder="Username">
-
-<input name="password" type="password" placeholder="Password">
-
-<button>Login</button>
-
-</form>
-
-</div>
-
-</body>
-</html>
-"""
-
-
-# ================= LOGOUT =================
-@app.route("/logout")
-def logout():
-
-    session.clear()
-
-    return redirect("/login")
-
-
-# ================= DASHBOARD =================
-@app.route("/dashboard")
-def dashboard():
+# ================= PDF EXPORT =================
+@app.route("/income/pdf")
+def income_pdf():
 
     if 'user_id' not in session:
-        return redirect("/login")
-
-    user_id = session['user_id']
+        return redirect('/login')
 
     db = get_db()
     cur = db.cursor()
 
-    filter_type = request.args.get('filter', 'all')
+    cur.execute("SELECT * FROM income ORDER BY id DESC")
+    rows = cur.fetchall()
 
-    income_filter = ""
-    expense_filter = ""
+    buffer = io.BytesIO()
+    pdf = SimpleDocTemplate(buffer, pagesize=A4)
 
-    if filter_type == "today":
-        income_filter = "AND DATE(date)=CURDATE()"
-        expense_filter = "AND DATE(date)=CURDATE()"
+    data = [["Amount", "Source", "Date", "Description"]]
 
-    elif filter_type == "month":
-        income_filter = "AND MONTH(date)=MONTH(CURDATE())"
-        expense_filter = "AND MONTH(date)=MONTH(CURDATE())"
+    for r in rows:
+        data.append([
+            str(r['amount']),
+            r['source'],
+            str(r['date']),
+            str(r.get('description', '-'))
+        ])
 
-    cur.execute(
-        f"SELECT COALESCE(SUM(amount),0) AS total FROM income WHERE user_id=%s {income_filter}",
-        (user_id,)
+    table = Table(data)
+    pdf.build([table])
+
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="income_report.pdf",
+        mimetype="application/pdf"
     )
 
-    income = float(cur.fetchone()['total'])
-
-    cur.execute(
-        f"SELECT COALESCE(SUM(amount),0) AS total FROM expenses WHERE user_id=%s {expense_filter}",
-        (user_id,)
-    )
-
-    expenses = float(cur.fetchone()['total'])
-
-    balance = income - expenses
-
-    cur.execute(
-        "SELECT COUNT(*) AS total FROM activities WHERE user_id=%s",
-        (user_id,)
-    )
-
-    act = cur.fetchone()['total']
-
-    db.close()
-
-    notif = "<div style='padding:10px;background:green;color:white;border-radius:8px'>System OK</div>"
-
-    if balance < 0:
-        notif = "<div style='padding:10px;background:red;color:white;border-radius:8px'>Low Balance Warning ⚠</div>"
-
-    return f"""
-<!DOCTYPE html>
-<html>
-
-<head>
-
-<title>Dashboard</title>
-
-<style>
-
-body{{
-margin:0;
-font-family:Arial;
-background:#f4f6fb;
-}}
-
-.header{{
-background:linear-gradient(90deg,#4e54c8,#8f94fb);
-color:white;
-padding:20px;
-text-align:center;
-font-size:22px;
-font-weight:bold;
-}}
-
-.card{{
-background:white;
-margin:15px;
-padding:18px;
-border-radius:15px;
-box-shadow:0 4px 10px rgba(0,0,0,0.08);
-}}
-
-.summary{{
-margin:15px;
-background:white;
-padding:15px;
-border-radius:15px;
-}}
-
-.box{{
-width:32%;
-padding:12px;
-border-radius:10px;
-color:white;
-text-align:center;
-}}
-
-.income-box{{
-background:#28a745;
-}}
-
-.expense-box{{
-background:#dc3545;
-}}
-
-.balance-box{{
-background:#007bff;
-}}
-
-a{{
-text-decoration:none;
-color:black;
-}}
-
-</style>
-</head>
-
-<body>
-
-<div class="header">HIRWA SMART</div>
-
-{notif}
-
-<div class="card">
-
-<h3>Menu</h3>
-
-<a href="/income">💰 Income</a><br><br>
-
-<a href="/expenses">💸 Expenses</a><br><br>
-
-<a href="/activity">📋 Activities</a><br><br>
-
-<a href="/ai_advice">🧠 AI Advice</a><br><br>
-
-<a href="/logout">🚪 Logout</a>
-
-</div>
-
-<div class="card">
-
-<form method="GET">
-
-<select name="filter">
-
-<option value="all">All</option>
-
-<option value="today">Today</option>
-
-<option value="month">This Month</option>
-
-</select>
-
-<button>Filter</button>
-
-</form>
-
-</div>
-
-<div class="summary">
-
-<h3>Summary</h3>
-
-<div style="display:flex;justify-content:space-between">
-
-<div class="box income-box">
-Income<br>{income}
-</div>
-
-<div class="box expense-box">
-Expenses<br>{expenses}
-</div>
-
-<div class="box balance-box">
-Balance<br>{balance}
-</div>
-
-</div>
-
-<p>Activities: {act}</p>
-
-</div>
-
-</body>
-</html>
-"""
 
 # ================= INCOME =================
 @app.route("/income", methods=["GET", "POST"])
@@ -446,6 +131,9 @@ def income():
     if edit_id:
         cur.execute("SELECT * FROM income WHERE id=%s", (edit_id,))
         edit_data = cur.fetchone()
+
+    # SEARCH
+    search = request.args.get("search", "")
 
     # ADD / UPDATE
     if request.method == "POST":
@@ -480,13 +168,7 @@ def income():
                     date=%s,
                     description=%s
                 WHERE id=%s
-                """, (
-                    amount,
-                    source,
-                    date,
-                    description,
-                    income_id
-                ))
+                """, (amount, source, date, description, income_id))
 
             # INSERT
             else:
@@ -516,8 +198,16 @@ def income():
         except Exception as e:
             return f"ERROR: {str(e)}"
 
-    # FETCH
-    cur.execute("SELECT * FROM income ORDER BY id DESC")
+    # FETCH (SEARCH ENABLED)
+    if search:
+        cur.execute("""
+        SELECT * FROM income
+        WHERE source LIKE %s OR description LIKE %s
+        ORDER BY id DESC
+        """, (f"%{search}%", f"%{search}%"))
+    else:
+        cur.execute("SELECT * FROM income ORDER BY id DESC")
+
     data = cur.fetchall()
 
     cur.execute("SELECT COALESCE(SUM(amount),0) AS total FROM income")
@@ -532,114 +222,35 @@ def income():
     desc_val = edit_data["description"] if edit_data else ""
     edit_id_val = edit_data["id"] if edit_data else ""
 
-    html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<title>Income</title>
-<style>
-body {{
-    font-family: Arial;
-    background: #f4f6fb;
-    margin: 20px;
-}}
-
-h2 {{
-    color: #2c3e50;
-}}
-
-form {{
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-}}
-
-input {{
-    width: 100%;
-    padding: 10px;
-    margin: 6px 0;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-}}
-
-button {{
-    padding: 10px 15px;
-    background: #28a745;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-}}
-
-table {{
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-}}
-
-th {{
-    background: #4e54c8;
-    color: white;
-    padding: 10px;
-}}
-
-td {{
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    text-align: center;
-}}
-
-a {{
-    text-decoration: none;
-    padding: 5px 8px;
-    border-radius: 5px;
-}}
-
-a[href*="edit"] {{
-    background: orange;
-    color: white;
-}}
-
-a[href*="delete"] {{
-    background: red;
-    color: white;
-}}
-
-.total-box {{
-    background: #eaf2ff;
-    padding: 10px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-}}
-</style>
-</head>
-
-<body>
-
+    return f"""
 <h2>💰 Income Management</h2>
 
-<div class="total-box">
-<strong>Total Income:</strong> {total}
-</div>
+<a href="/income/pdf"><button>📄 Export PDF</button></a>
+
+<form method="GET">
+    <input name="search" placeholder="Search income...">
+    <button>Search</button>
+</form>
+
+<h3>Total: {total}</h3>
 
 <form method="POST">
 
 <input type="hidden" name="id" value="{edit_id_val}">
 
-<input name="amount" placeholder="Amount" value="{amount_val}" required>
+<input name="amount" placeholder="Amount" value="{amount_val}" required><br><br>
 
-<input name="source" placeholder="Source" value="{source_val}" required>
+<input name="source" placeholder="Source" value="{source_val}" required><br><br>
 
-<input type="date" name="date" value="{date_val}">
+<input type="date" name="date" value="{date_val}"><br><br>
 
-<input name="description" placeholder="Description" value="{desc_val}">
+<input name="description" placeholder="Description" value="{desc_val}"><br><br>
 
 <button>{'Update' if edit_data else 'Add'}</button>
 
 </form>
 
-<table>
+<table border="1">
 
 <tr>
 <th>Amount</th>
@@ -648,35 +259,26 @@ a[href*="delete"] {{
 <th>Description</th>
 <th>Action</th>
 </tr>
-"""
 
-    for r in data:
-
-        html += f"""
+""" + "".join([
+f"""
 <tr>
 <td>{r['amount']}</td>
 <td>{r['source']}</td>
 <td>{r['date']}</td>
 <td>{r.get('description','-')}</td>
-
 <td>
-<a href="/income?edit={r['id']}">Edit</a>
-<a href="/income?delete={r['id']}" onclick="return confirm('Delete this item?')">Delete</a>
+<a href="/income?edit={r['id']}">Edit</a> |
+<a href="/income?delete={r['id']}">Delete</a>
 </td>
 </tr>
-"""
-
-    html += """
+""" for r in data
+]) + """
 </table>
 
 <br>
 <a href="/dashboard">⬅ Back</a>
-
-</body>
-</html>
 """
-
-    return html
 # ================= EXPENSES =================
 @app.route('/expenses', methods=['GET', 'POST'])
 def expenses():
