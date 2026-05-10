@@ -375,8 +375,7 @@ def income():
 
     cur.execute("SELECT SUM(amount) FROM income")
     total_row = cur.fetchone()
-    total = total_row[0] if total_row and total_row[0] is not None else 0
-
+    total = total_row["total"] if total_row and total_row["total"] is not None else 0
     # ================= SAFE EDIT VALUES =================
     amount_val = edit_data["amount"] if edit_data else ""
     source_val = edit_data["source"] if edit_data else ""
@@ -500,7 +499,6 @@ def expenses():
             <td>{r['date']}</td>
             <td>{r.get('description','')}</td>
             <td>{r.get('done_by','')}</td>
-            <td>{r['status']}</td>
             <td>{r['created_at']}</td>
             <td>
                 <a href='?delete={r['id']}'>Delete</a>
