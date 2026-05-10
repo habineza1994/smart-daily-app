@@ -374,8 +374,12 @@ def income():
     data = cur.fetchall()
 
     cur.execute("SELECT SUM(amount) FROM income")
-    total_row = cur.fetchone()
-    total = total_row["total"] if total_row and total_row["total"] is not None else 0
+total_row = cur.fetchone()
+
+if total_row:
+    total = list(total_row.values())[0] or 0
+else:
+    total = 0
     # ================= SAFE EDIT VALUES =================
     amount_val = edit_data["amount"] if edit_data else ""
     source_val = edit_data["source"] if edit_data else ""
