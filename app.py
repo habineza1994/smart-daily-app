@@ -116,7 +116,7 @@ def income():
     db = get_db()
     cur = db.cursor()
 
-    # DELETE
+    # ================= DELETE =================
     delete_id = request.args.get("delete")
 
     if delete_id:
@@ -124,7 +124,7 @@ def income():
         db.commit()
         return redirect("/income")
 
-    # EDIT
+    # ================= EDIT =================
     edit_id = request.args.get("edit")
     edit_data = None
 
@@ -132,10 +132,10 @@ def income():
         cur.execute("SELECT * FROM income WHERE id=%s", (edit_id,))
         edit_data = cur.fetchone()
 
-    # SEARCH
+    # ================= SEARCH =================
     search = request.args.get("search", "")
 
-    # ADD / UPDATE
+    # ================= ADD / UPDATE =================
     if request.method == "POST":
 
         try:
@@ -146,7 +146,6 @@ def income():
             date = request.form.get("date")
             description = request.form.get("description")
 
-            # VALIDATION
             if not amount or not source:
                 return "Amount and Source are required ❌"
 
@@ -158,9 +157,7 @@ def income():
             if not date:
                 date = None
 
-            # UPDATE
             if income_id:
-
                 cur.execute("""
                 UPDATE income
                 SET amount=%s,
@@ -170,9 +167,7 @@ def income():
                 WHERE id=%s
                 """, (amount, source, date, description, income_id))
 
-            # INSERT
             else:
-
                 cur.execute("""
                 INSERT INTO income(
                     amount,
@@ -198,7 +193,7 @@ def income():
         except Exception as e:
             return f"ERROR: {str(e)}"
 
-    # FETCH (SEARCH ENABLED)
+    # ================= FETCH =================
     if search:
         cur.execute("""
         SELECT * FROM income
@@ -215,43 +210,154 @@ def income():
 
     db.close()
 
-    # EDIT VALUES
+    # ================= EDIT VALUES =================
     amount_val = edit_data["amount"] if edit_data else ""
     source_val = edit_data["source"] if edit_data else ""
     date_val = edit_data["date"] if edit_data else ""
     desc_val = edit_data["description"] if edit_data else ""
     edit_id_val = edit_data["id"] if edit_data else ""
 
+    # ================= HTML ROWS =================
+    html_rows = ""
+
+    for r in data:
+        html_rows += f"""
+<tr>
+<td>{r['amount']}</td>
+<td>{r['source']}</td>
+<td>{r['date']}</td>
+<td>{r.get('description','-')}</td>
+<td>
+<a class="edit" href="/income?edit={r['id']}">Edit</a>
+<a class="delete" href="/income?delete={r['id']}" onclick="return confirm('Delete this item?')">Delete</a>
+</td>
+</tr>
+"""
+
+    # ================= FINAL HTML =================
     return f"""
+<!DOCTYPE html>
+<html>
+<head>
+<title>Income</title>
+
+<style>
+body {{
+    font-family: 'Segoe UI';
+    background: #f4f6fb;
+    margin: 20px;
+}}
+
+.container {{
+    max-width: 1000px;
+    margin: auto;
+}}
+
+h2 {{
+    text-align: center;
+}}
+
+.card {{
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    margin-bottom: 20px;
+}}
+
+form {{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}}
+
+input {{
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}}
+
+button {{
+    grid-column: span 2;
+    padding: 12px;
+    background: #4e54c8;
+    color: white;
+    border: none;
+    border-radius: 8px;
+}}
+
+table {{
+    width: 100%;
+    border-collapse: collapse;
+}}
+
+th {{
+    background: #4e54c8;
+    color: white;
+    padding: 10px;
+}}
+
+td {{
+    text-align: center;
+    padding: 10px;
+}}
+
+.edit {{ background: orange; color: white; padding:5px; border-radius:5px; }}
+.delete {{ background: red; color: white; padding:5px; border-radius:5px; }}
+
+.search {{
+    display:flex;
+    gap:10px;
+}}
+
+.search input {{
+    flex:1;
+}}
+
+.total {{
+    background:#eaf2ff;
+    padding:10px;
+    border-radius:10px;
+    margin-bottom:10px;
+}}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
 <h2>💰 Income Management</h2>
 
-<a href="/income/pdf"><button>📄 Export PDF</button></a>
+<div class="total">
+Total Income: {total}
+</div>
 
-<form method="GET">
-    <input name="search" placeholder="Search income...">
-    <button>Search</button>
+<div class="card">
+
+<form method="GET" class="search">
+<input name="search" placeholder="Search income">
+<button>Search</button>
 </form>
-
-<h3>Total: {total}</h3>
 
 <form method="POST">
 
 <input type="hidden" name="id" value="{edit_id_val}">
 
-<input name="amount" placeholder="Amount" value="{amount_val}" required><br><br>
+<input name="amount" placeholder="Amount" value="{amount_val}" required>
+<input name="source" placeholder="Source" value="{source_val}" required>
+<input type="date" name="date" value="{date_val}">
+<input name="description" placeholder="Description" value="{desc_val}">
 
-<input name="source" placeholder="Source" value="{source_val}" required><br><br>
-
-<input type="date" name="date" value="{date_val}"><br><br>
-
-<input name="description" placeholder="Description" value="{desc_val}"><br><br>
-
-<button>{'Update' if edit_data else 'Add'}</button>
+<button>{'Update Income' if edit_data else 'Add Income'}</button>
 
 </form>
 
-<table border="1">
+</div>
 
+<div class="card">
+
+<table>
 <tr>
 <th>Amount</th>
 <th>Source</th>
@@ -260,24 +366,22 @@ def income():
 <th>Action</th>
 </tr>
 
-""" + "".join([
-f"""
-<tr>
-<td>{r['amount']}</td>
-<td>{r['source']}</td>
-<td>{r['date']}</td>
-<td>{r.get('description','-')}</td>
-<td>
-<a href="/income?edit={r['id']}">Edit</a> |
-<a href="/income?delete={r['id']}">Delete</a>
-</td>
-</tr>
-""" for r in data
-]) + """
+{html_rows}
+
 </table>
 
 <br>
+
+<div style="text-align:center;">
 <a href="/dashboard">⬅ Back</a>
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>
 """
 # ================= EXPENSES =================
 @app.route('/expenses', methods=['GET', 'POST'])
