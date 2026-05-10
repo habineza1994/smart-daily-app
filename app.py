@@ -330,7 +330,7 @@ def income():
         db.commit()
         return redirect("/income")
 
-    # ================= EDIT DATA =================
+    # ================= EDIT =================
     edit_id = request.args.get("edit")
     edit_data = None
 
@@ -339,7 +339,6 @@ def income():
         edit_data = cur.fetchone()
 
     # ================= ADD / UPDATE =================
-
     if request.method == "POST":
         try:
             income_id = request.form.get("id")
@@ -348,7 +347,7 @@ def income():
             date = request.form.get('date') or None
             description = request.form['description']
 
-            if income_id:  # UPDATE
+            if income_id:
                 cur.execute("""
                     UPDATE income
                     SET amount=%s,
@@ -357,8 +356,7 @@ def income():
                         description=%s
                     WHERE id=%s
                 """, (amount, source, date, description, income_id))
-
-            else:  # INSERT
+            else:
                 cur.execute("""
                     INSERT INTO income (amount, source, date, description)
                     VALUES (%s, %s, %s, %s)
@@ -374,10 +372,11 @@ def income():
     cur.execute("SELECT * FROM income ORDER BY id DESC")
     data = cur.fetchall()
 
-    cur.execute("SELECT SUM(amount) as total FROM income")
-    total = cur.fetchone()["total"] or 0
+    cur.execute("SELECT SUM(amount) FROM income")
+    total_row = cur.fetchone()
+    total = total_row[0] if total_row and total_row[0] else 0
 
-    # ================= SAFE EDIT VALUES =================
+    # ================= SAFE EDIT =================
     amount_val = edit_data["amount"] if edit_data else ""
     source_val = edit_data["source"] if edit_data else ""
     date_val = edit_data["date"] if edit_data else ""
@@ -394,7 +393,6 @@ def income():
         desc_val=desc_val,
         edit_id_val=edit_id_val
     )
-
     # ================= HTML =================
     html = f"""
     <!DOCTYPE html>
