@@ -21,8 +21,6 @@ def get_db():
         database=os.environ.get('MYSQLDATABASE'),
         cursorclass=pymysql.cursors.DictCursor
     )
-
-
 # ================= INIT DB =================
 @app.route("/initdb")
 def init_db():
@@ -89,11 +87,37 @@ def init_db():
     )
     """)
 
+    # ================= SAFE FIX (NO ERRORS ON OLD DB) =================
+    fixes = [
+        "ALTER TABLE income ADD COLUMN description TEXT",
+        "ALTER TABLE income ADD COLUMN done_by VARCHAR(100)",
+        "ALTER TABLE income ADD COLUMN status VARCHAR(50)",
+        "ALTER TABLE income ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE income ADD COLUMN updated_at TIMESTAMP NULL",
+
+        "ALTER TABLE expenses ADD COLUMN description TEXT",
+        "ALTER TABLE expenses ADD COLUMN done_by VARCHAR(100)",
+        "ALTER TABLE expenses ADD COLUMN status VARCHAR(50)",
+        "ALTER TABLE expenses ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP NULL",
+
+        "ALTER TABLE activities ADD COLUMN description TEXT",
+        "ALTER TABLE activities ADD COLUMN done_by VARCHAR(100)",
+        "ALTER TABLE activities ADD COLUMN status VARCHAR(50)",
+        "ALTER TABLE activities ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE activities ADD COLUMN updated_at TIMESTAMP NULL",
+    ]
+
+    for q in fixes:
+        try:
+            cur.execute(q)
+        except:
+            pass
+
     db.commit()
     db.close()
 
-    return "🚀 DATABASE READY"
-
+    return "🚀 DATABASE READY (FULL FIXED VERSION)"
 
 # ================= LOGIN =================
 @app.route("/login", methods=["GET", "POST"])
