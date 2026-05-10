@@ -419,7 +419,6 @@ Balance<br>{balance}
 </html>
 """
 
-
 # ================= INCOME =================
 @app.route("/income", methods=["GET", "POST"])
 def income():
@@ -433,7 +432,6 @@ def income():
     if delete_id:
         cur.execute("DELETE FROM income WHERE id=%s", (delete_id,))
         db.commit()
-
         return redirect("/income")
 
     # EDIT
@@ -448,7 +446,6 @@ def income():
     if request.method == "POST":
 
         try:
-
             income_id = request.form.get("id")
 
             amount = request.form.get("amount")
@@ -495,7 +492,6 @@ def income():
                 ))
 
             db.commit()
-
             return redirect("/income")
 
         except Exception as e:
@@ -506,14 +502,12 @@ def income():
     SELECT * FROM income
     ORDER BY id DESC
     """)
-
     data = cur.fetchall()
 
     cur.execute("""
     SELECT COALESCE(SUM(amount),0) AS total
     FROM income
     """)
-
     total = cur.fetchone()['total']
 
     db.close()
@@ -525,27 +519,113 @@ def income():
     edit_id_val = edit_data["id"] if edit_data else ""
 
     html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<title>Income</title>
+<style>
+body {{
+    font-family: Arial;
+    background: #f4f6fb;
+    margin: 20px;
+}}
+
+h2 {{
+    color: #2c3e50;
+}}
+
+form {{
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}}
+
+input {{
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}}
+
+button {{
+    padding: 10px 15px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}}
+
+table {{
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}}
+
+th {{
+    background: #4e54c8;
+    color: white;
+    padding: 10px;
+}}
+
+td {{
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+}}
+
+a {{
+    text-decoration: none;
+    padding: 5px 8px;
+    border-radius: 5px;
+}}
+
+a[href*="edit"] {{
+    background: orange;
+    color: white;
+}}
+
+a[href*="delete"] {{
+    background: red;
+    color: white;
+}}
+
+.total-box {{
+    background: #eaf2ff;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}}
+</style>
+</head>
+
+<body>
+
 <h2>💰 Income Management</h2>
+
+<div class="total-box">
+<strong>Total Income:</strong> {total}
+</div>
 
 <form method="POST">
 
 <input type="hidden" name="id" value="{edit_id_val}">
 
-<input name="amount" placeholder="Amount" value="{amount_val}" required><br><br>
+<input name="amount" placeholder="Amount" value="{amount_val}" required>
 
-<input name="source" placeholder="Source" value="{source_val}" required><br><br>
+<input name="source" placeholder="Source" value="{source_val}" required>
 
-<input type="date" name="date" value="{date_val}"><br><br>
+<input type="date" name="date" value="{date_val}">
 
-<input name="description" placeholder="Description" value="{desc_val}"><br><br>
+<input name="description" placeholder="Description" value="{desc_val}">
 
 <button>{'Update' if edit_data else 'Add'}</button>
 
 </form>
 
-<h3>Total: {total}</h3>
-
-<table border="1">
+<table>
 
 <tr>
 <th>Amount</th>
@@ -562,16 +642,13 @@ def income():
 <tr>
 
 <td>{r['amount']}</td>
-
 <td>{r['source']}</td>
-
 <td>{r['date']}</td>
-
-<td>{r.get('description','')}</td>
+<td>{r.get('description','-')}</td>
 
 <td>
-<a href="/income?edit={r['id']}">Edit</a> |
-<a href="/income?delete={r['id']}">Delete</a>
+<a href="/income?edit={r['id']}">Edit</a>
+<a href="/income?delete={r['id']}" onclick="return confirm('Delete this item?')">Delete</a>
 </td>
 
 </tr>
@@ -581,13 +658,13 @@ def income():
 </table>
 
 <br>
-
 <a href="/dashboard">⬅ Back</a>
+
+</body>
+</html>
 """
 
     return html
-
-
 # ================= EXPENSES =================
 @app.route('/expenses', methods=['GET', 'POST'])
 def expenses():
