@@ -384,16 +384,6 @@ def income():
     desc_val = edit_data["description"] if edit_data else ""
     edit_id_val = edit_data["id"] if edit_data else ""
 
-    return render_template(
-        "income.html",
-        data=data,
-        total=total,
-        amount_val=amount_val,
-        source_val=source_val,
-        date_val=date_val,
-        desc_val=desc_val,
-        edit_id_val=edit_id_val
-    )
     # ================= HTML =================
     html = f"""
     <!DOCTYPE html>
