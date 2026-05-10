@@ -339,7 +339,9 @@ def income():
         edit_data = cur.fetchone()
 
     # ================= ADD / UPDATE =================
-    if request.method == "POST":
+# ================= ADD / UPDATE =================
+if request.method == "POST":
+    try:
         income_id = request.form.get("id")
         amount = request.form['amount']
         source = request.form['source']
@@ -360,6 +362,9 @@ def income():
 
         db.commit()
         return redirect("/income")
+
+    except Exception as e:
+        return f"ERROR: {str(e)}"
 
     # ================= FETCH DATA =================
     cur.execute("SELECT * FROM income ORDER BY id DESC")
