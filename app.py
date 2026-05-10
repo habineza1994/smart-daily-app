@@ -25,6 +25,7 @@ def get_db():
         cursorclass=pymysql.cursors.DictCursor
     )
 
+
 # ================= INIT DB =================
 @app.route("/initdb")
 def init_db():
@@ -32,7 +33,6 @@ def init_db():
     db = get_db()
     cur = db.cursor()
 
-    # USERS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -42,7 +42,6 @@ def init_db():
     )
     """)
 
-    # INCOME
     cur.execute("""
     CREATE TABLE IF NOT EXISTS income(
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -50,19 +49,15 @@ def init_db():
         source VARCHAR(255),
         date DATE,
         description TEXT,
-        done_by VARCHAR(100),
-        status VARCHAR(50) DEFAULT 'approved',
-        user_id INT,
-        deleted_at TIMESTAMP NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        user_id INT
     )
     """)
 
     db.commit()
     db.close()
 
-    return "🚀 DATABASE READY (FULL FIXED VERSION)"
+    return "DATABASE READY 🚀"
+
 
 # ================= LOGIN =================
 @app.route("/login", methods=["GET", "POST"])
@@ -76,15 +71,11 @@ def login():
         db = get_db()
         cur = db.cursor()
 
-        cur.execute(
-            "SELECT * FROM users WHERE username=%s",
-            (username,)
-        )
-
+        cur.execute("SELECT * FROM users WHERE username=%s", (username,))
         user = cur.fetchone()
+
         db.close()
 
-        # 🔐 SAFE PASSWORD CHECK
         if user and check_password_hash(user['password'], password):
 
             session['user_id'] = user['id']
@@ -95,71 +86,12 @@ def login():
         return "Login Failed ❌"
 
     return """
-<!DOCTYPE html>
-<html>
-<head>
-<title>HIRWA SMART Login</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<style>
-body{
-    margin:0;
-    font-family:Arial;
-    background:linear-gradient(120deg,#4e54c8,#8f94fb);
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-}
-
-.card{
-    background:white;
-    width:92%;
-    max-width:420px;
-    padding:25px;
-    border-radius:20px;
-    box-shadow:0 10px 25px rgba(0,0,0,0.15);
-}
-
-input{
-    width:100%;
-    padding:14px;
-    margin:10px 0;
-    border-radius:10px;
-    border:1px solid #ddd;
-}
-
-button{
-    width:100%;
-    padding:14px;
-    border:none;
-    border-radius:10px;
-    background:#4e54c8;
-    color:white;
-}
-</style>
-</head>
-
-<body>
-
-<div class="card">
-
-<h2 style="text-align:center;">HIRWA SMART</h2>
-
-<form method="POST">
-
-<input name="username" placeholder="Username" required>
-<input name="password" type="password" placeholder="Password" required>
-
-<button>Login</button>
-
-</form>
-
-</div>
-
-</body>
-</html>
-"""
+    <form method="POST">
+        <input name="username" placeholder="Username" required>
+        <input name="password" type="password" placeholder="Password" required>
+        <button>Login</button>
+    </form>
+    """
 
 
 # ================= LOGOUT =================
@@ -169,7 +101,7 @@ def logout():
     return redirect("/login")
 
 
-# ================= DASHBOARD =================
+# ================= DASHBOARD (FIXED) =================
 @app.route("/dashboard")
 def dashboard():
 
@@ -194,21 +126,18 @@ def dashboard():
         income_filter = "AND MONTH(date)=MONTH(CURDATE())"
         expense_filter = "AND MONTH(date)=MONTH(CURDATE())"
 
-    # INCOME
     cur.execute(
         f"SELECT COALESCE(SUM(amount),0) AS total FROM income WHERE user_id=%s {income_filter}",
         (user_id,)
     )
     income = float(cur.fetchone()['total'])
 
-    # EXPENSES
     cur.execute(
         f"SELECT COALESCE(SUM(amount),0) AS total FROM expenses WHERE user_id=%s {expense_filter}",
         (user_id,)
     )
     expenses = float(cur.fetchone()['total'])
 
-    # ACTIVITIES
     cur.execute(
         "SELECT COUNT(*) AS total FROM activities WHERE user_id=%s",
         (user_id,)
@@ -224,28 +153,19 @@ def dashboard():
         notif = "<div style='padding:10px;background:red;color:white'>LOW BALANCE ⚠</div>"
 
     return f"""
-    <h1>Dashboard</h1>
-    {notif}
-    <p>Income: {income}</p>
-    <p>Expenses: {expenses}</p>
-    <p>Balance: {balance}</p>
-    <p>Activities: {act}</p>
-    <a href="/logout">Logout</a>
-    """
 <!DOCTYPE html>
 <html>
 <head>
 <title>Dashboard</title>
 
 <style>
-
-body{{
+body {{
 margin:0;
 font-family:Arial;
 background:#f4f6fb;
 }}
 
-.header{{
+.header {{
 background:linear-gradient(90deg,#4e54c8,#8f94fb);
 color:white;
 padding:20px;
@@ -254,7 +174,7 @@ font-size:22px;
 font-weight:bold;
 }}
 
-.card{{
+.card {{
 background:white;
 margin:15px;
 padding:18px;
@@ -262,32 +182,11 @@ border-radius:15px;
 box-shadow:0 4px 10px rgba(0,0,0,0.08);
 }}
 
-.summary{{
-margin:15px;
-background:white;
-padding:15px;
-border-radius:15px;
-}}
-
-.box{{
-width:32%;
-padding:12px;
-border-radius:10px;
-color:white;
-text-align:center;
-}}
-
-.income-box{{ background:#28a745; }}
-.expense-box{{ background:#dc3545; }}
-.balance-box{{ background:#007bff; }}
-
-a{{
+a {{
 text-decoration:none;
 color:black;
 }}
-
 </style>
-
 </head>
 
 <body>
@@ -297,55 +196,30 @@ color:black;
 {notif}
 
 <div class="card">
-
 <h3>Menu</h3>
-
 <a href="/income">💰 Income</a><br><br>
-<a href="/expenses">💸 Expenses</a><br><br>
-<a href="/activity">📋 Activities</a><br><br>
-<a href="/ai_advice">🧠 AI Advice</a><br><br>
 <a href="/logout">🚪 Logout</a>
-
 </div>
 
 <div class="card">
 
 <form method="GET">
-
 <select name="filter">
 <option value="all">All</option>
 <option value="today">Today</option>
 <option value="month">This Month</option>
 </select>
-
 <button>Filter</button>
-
 </form>
 
 </div>
 
-<div class="summary">
-
+<div class="card">
 <h3>Summary</h3>
-
-<div style="display:flex;justify-content:space-between">
-
-<div class="box income-box">
-Income<br>{income}
-</div>
-
-<div class="box expense-box">
-Expenses<br>{expenses}
-</div>
-
-<div class="box balance-box">
-Balance<br>{balance}
-</div>
-
-</div>
-
+<p>Income: {income}</p>
+<p>Expenses: {expenses}</p>
+<p>Balance: {balance}</p>
 <p>Activities: {act}</p>
-
 </div>
 
 </body>
