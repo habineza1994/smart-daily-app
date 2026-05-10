@@ -356,7 +356,6 @@ def income():
                         description=%s
                     WHERE id=%s
                 """, (amount, source, date, description, income_id))
-
             else:
                 cur.execute("""
                     INSERT INTO income (amount, source, date, description)
@@ -370,16 +369,17 @@ def income():
             return f"ERROR: {str(e)}"
 
     # ================= FETCH DATA =================
-cur.execute("SELECT * FROM income ORDER BY id DESC")
-data = cur.fetchall()
+    cur.execute("SELECT * FROM income ORDER BY id DESC")
+    data = cur.fetchall()
 
-cur.execute("SELECT SUM(amount) FROM income")
-total_row = cur.fetchone()
+    cur.execute("SELECT SUM(amount) FROM income")
+    total_row = cur.fetchone()
 
-if total_row and total_row[0] is not None:
-    total = total_row[0]
-else:
-    total = 0
+    if total_row and total_row[0] is not None:
+        total = total_row[0]
+    else:
+        total = 0
+
     # ================= SAFE EDIT VALUES =================
     amount_val = edit_data["amount"] if edit_data else ""
     source_val = edit_data["source"] if edit_data else ""
@@ -462,6 +462,8 @@ else:
     """
 
     return html
+
+
 @app.route('/expenses', methods=['GET','POST'])
 def expenses():
     db = get_db()
