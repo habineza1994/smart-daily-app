@@ -348,23 +348,27 @@ if request.method == "POST":
         date = request.form.get('date') or None
         description = request.form['description']
 
-        if income_id:
+        if income_id:  # UPDATE
             cur.execute("""
                 UPDATE income
-                SET amount=%s, source=%s, date=%s, description=%s
-                WHERE id=%s
+                SET amount = %s,
+                    source = %s,
+                    date = %s,
+                    description = %s
+                WHERE id = %s
             """, (amount, source, date, description, income_id))
-        else:
+
+        else:  # INSERT
             cur.execute("""
-                INSERT INTO income(amount, source, date, description)
-                VALUES(%s, %s, %s, %s)
+                INSERT INTO income (amount, source, date, description)
+                VALUES (%s, %s, %s, %s)
             """, (amount, source, date, description))
 
         db.commit()
+        return redirect("/income")
 
     except Exception as e:
         return f"ERROR: {str(e)}"
-
     # ================= FETCH DATA =================
     cur.execute("SELECT * FROM income ORDER BY id DESC")
     data = cur.fetchall()
