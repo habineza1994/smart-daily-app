@@ -343,7 +343,7 @@ def income():
         income_id = request.form.get("id")
         amount = request.form['amount']
         source = request.form['source']
-        date = request.form['date']
+        date = request.form.get('date') or None
         description = request.form['description']
 
         if income_id:
@@ -405,7 +405,7 @@ def income():
 
             <input name="amount" placeholder="Amount" value="{amount_val}" required>
             <input name="source" placeholder="Source" value="{source_val}" required>
-            <input type="date" name="date" value="{date_val}" required>
+            <input type="date" name="date" value="{date_val}">
             <input name="description" placeholder="Description" value="{desc_val}">
 
             <button type="submit">{'Update' if edit_data else 'Add'}</button>
