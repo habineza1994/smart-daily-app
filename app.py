@@ -4,11 +4,10 @@ import io
 import pymysql
 
 from flask import Flask, request, redirect, session, send_file
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib.pagesizes import A4
-
-from ai_engine import analyze_finance
 
 app = Flask(__name__)
 
@@ -25,7 +24,6 @@ def get_db():
         database=os.environ.get('MYSQLDATABASE'),
         cursorclass=pymysql.cursors.DictCursor
     )
-
 
 # ================= INIT DB =================
 @app.route("/initdb")
@@ -72,21 +70,22 @@ def login():
 
     if request.method == "POST":
 
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+
         db = get_db()
         cur = db.cursor()
 
         cur.execute(
             "SELECT * FROM users WHERE username=%s",
-            (request.form['username'],)
+            (username,)
         )
 
         user = cur.fetchone()
         db.close()
 
-        # ❌ OLD: password comparison insecure removed
-        # ⚠️ NOTE: ideally use hashed password (we can upgrade later)
-
-        if user and user['password'] == request.form['password']:
+        # 🔐 SAFE PASSWORD CHECK
+        if user and check_password_hash(user['password'], password):
 
             session['user_id'] = user['id']
             session['username'] = user['username']
@@ -195,23 +194,21 @@ def dashboard():
         income_filter = "AND MONTH(date)=MONTH(CURDATE())"
         expense_filter = "AND MONTH(date)=MONTH(CURDATE())"
 
-    # ================= INCOME =================
+    # INCOME
     cur.execute(
         f"SELECT COALESCE(SUM(amount),0) AS total FROM income WHERE user_id=%s {income_filter}",
         (user_id,)
     )
     income = float(cur.fetchone()['total'])
 
-    # ================= EXPENSES =================
+    # EXPENSES
     cur.execute(
         f"SELECT COALESCE(SUM(amount),0) AS total FROM expenses WHERE user_id=%s {expense_filter}",
         (user_id,)
     )
     expenses = float(cur.fetchone()['total'])
 
-    balance = income - expenses
-
-    # ================= ACTIVITIES =================
+    # ACTIVITIES
     cur.execute(
         "SELECT COUNT(*) AS total FROM activities WHERE user_id=%s",
         (user_id,)
@@ -220,12 +217,21 @@ def dashboard():
 
     db.close()
 
-    notif = "<div style='padding:10px;background:green;color:white;border-radius:8px'>System OK</div>"
+    balance = income - expenses
 
+    notif = "<div style='padding:10px;background:green;color:white'>OK</div>"
     if balance < 0:
-        notif = "<div style='padding:10px;background:red;color:white;border-radius:8px'>Low Balance Warning ⚠</div>"
+        notif = "<div style='padding:10px;background:red;color:white'>LOW BALANCE ⚠</div>"
 
     return f"""
+    <h1>Dashboard</h1>
+    {notif}
+    <p>Income: {income}</p>
+    <p>Expenses: {expenses}</p>
+    <p>Balance: {balance}</p>
+    <p>Activities: {act}</p>
+    <a href="/logout">Logout</a>
+    """
 <!DOCTYPE html>
 <html>
 <head>
