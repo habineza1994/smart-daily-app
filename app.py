@@ -361,7 +361,6 @@ if request.method == "POST":
             """, (amount, source, date, description))
 
         db.commit()
-        return redirect("/income")
 
     except Exception as e:
         return f"ERROR: {str(e)}"
