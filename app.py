@@ -1,18 +1,15 @@
 # ================= IMPORTS =================
-import os
-import io
+import os 
+from ai_engine import analyze_finance
+import datetime
 import pymysql
-
 from flask import Flask, request, redirect, session, send_file
-from werkzeug.security import generate_password_hash, check_password_hash
 
 from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib.pagesizes import A4
 
 app = Flask(__name__)
-
-# ================= SECRET KEY =================
-app.secret_key = os.environ.get("SECRET_KEY", "hirwa_secret_key")
+app.secret_key = "hirwa_secret_key"
 
 
 # ================= DB =================
@@ -26,13 +23,13 @@ def get_db():
     )
 
 
-# ================= INIT DB =================
+# ================= INIT DB (PRO VERSION SAFE) =================
 @app.route("/initdb")
 def init_db():
-
     db = get_db()
     cur = db.cursor()
 
+    # ================= USERS =================
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -42,6 +39,7 @@ def init_db():
     )
     """)
 
+    # ================= INCOME =================
     cur.execute("""
     CREATE TABLE IF NOT EXISTS income(
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -49,71 +47,195 @@ def init_db():
         source VARCHAR(255),
         date DATE,
         description TEXT,
-        user_id INT
+        done_by VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'approved',
+        user_id INT,
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
     """)
 
+    # ================= EXPENSES =================
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS expenses(
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        amount DECIMAL(10,2),
+        category VARCHAR(255),
+        date DATE,
+        description TEXT,
+        done_by VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'approved',
+        user_id INT,
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ================= ACTIVITIES =================
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS activities(
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        activity_name VARCHAR(255),
+        done_by VARCHAR(255),
+        date DATE,
+        description TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
+        user_id INT,
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ================= INDEXES =================
+    try:
+        cur.execute("CREATE INDEX idx_income_user ON income(user_id)")
+    except:
+        pass
+
+    try:
+        cur.execute("CREATE INDEX idx_expenses_user ON expenses(user_id)")
+    except:
+        pass
+
+    try:
+        cur.execute("CREATE INDEX idx_activities_user ON activities(user_id)")
+    except:
+        pass
+
+    # ================= AUTO FIX (SAFE FOR OLD DB) =================
+
+    # INCOME
+    for q in [
+        "ALTER TABLE income ADD COLUMN description TEXT",
+        "ALTER TABLE income ADD COLUMN done_by VARCHAR(100)",
+        "ALTER TABLE income ADD COLUMN status VARCHAR(50) DEFAULT 'approved'",
+        "ALTER TABLE income ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE income ADD COLUMN updated_at TIMESTAMP NULL"
+    ]:
+        try:
+            cur.execute(q)
+        except:
+            pass
+
+    # EXPENSES
+    for q in [
+        "ALTER TABLE expenses ADD COLUMN description TEXT",
+        "ALTER TABLE expenses ADD COLUMN done_by VARCHAR(100)",
+        "ALTER TABLE expenses ADD COLUMN status VARCHAR(50) DEFAULT 'approved'",
+        "ALTER TABLE expenses ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE expenses ADD COLUMN updated_at TIMESTAMP NULL"
+    ]:
+        try:
+            cur.execute(q)
+        except:
+            pass
+
+    # ACTIVITIES
+    for q in [
+        "ALTER TABLE activities ADD COLUMN description TEXT",
+        "ALTER TABLE activities ADD COLUMN status VARCHAR(50) DEFAULT 'pending'",
+        "ALTER TABLE activities ADD COLUMN deleted_at TIMESTAMP NULL",
+        "ALTER TABLE activities ADD COLUMN updated_at TIMESTAMP NULL"
+    ]:
+        try:
+            cur.execute(q)
+        except:
+            pass
+
     db.commit()
-    db.close()
-
-    return "DATABASE READY 🚀"
-
-
+    return "🚀 PRO DATABASE READY (SAFE MODE) ✅"
 # ================= LOGIN =================
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET","POST"])
 def login():
-
     if request.method == "POST":
-
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
-
         db = get_db()
         cur = db.cursor()
 
-        cur.execute("SELECT * FROM users WHERE username=%s", (username,))
+        cur.execute("SELECT * FROM users WHERE username=%s AND password=%s",
+                    (request.form['username'], request.form['password']))
         user = cur.fetchone()
 
-        db.close()
-
-        if user and check_password_hash(user['password'], password):
-
+        if user:
             session['user_id'] = user['id']
-            session['username'] = user['username']
-
             return redirect("/dashboard")
 
-        return "Login Failed ❌"
+        return "Login failed ❌"
 
     return """
-    <form method="POST">
-        <input name="username" placeholder="Username" required>
-        <input name="password" type="password" placeholder="Password" required>
-        <button>Login</button>
-    </form>
-    """
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:linear-gradient(120deg,#4e54c8,#8f94fb);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+.card{
+    background:white;
+    width:92%;
+    max-width:420px;
+    padding:25px;
+    border-radius:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.15);
+}
+input{
+    width:100%;
+    padding:14px;
+    margin:10px 0;
+    border-radius:10px;
+    border:1px solid #ddd;
+}
+button{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#4e54c8;
+    color:white;
+}
+</style>
+</head>
+<body>
+<div class="card">
+<h2 style="text-align:center;">HIRWA SMART</h2>
+<form method="POST">
+<input name="username" placeholder="Username">
+<input name="password" type="password" placeholder="Password">
+<button>Login</button>
+</form>
+</div>
+</body>
+</html>
+"""
 
 
-# ================= LOGOUT =================
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/login")
 
 
-# ================= DASHBOARD (FIXED) =================
+# ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
-
     if 'user_id' not in session:
-        return redirect("/login")
+        return redirect('/login')
 
     user_id = session['user_id']
-
     db = get_db()
     cur = db.cursor()
 
-    filter_type = request.args.get('filter', 'all')
+    filter_type = request.args.get('filter','all')
 
     income_filter = ""
     expense_filter = ""
@@ -121,88 +243,58 @@ def dashboard():
     if filter_type == "today":
         income_filter = "AND DATE(date)=CURDATE()"
         expense_filter = "AND DATE(date)=CURDATE()"
-
     elif filter_type == "month":
         income_filter = "AND MONTH(date)=MONTH(CURDATE())"
         expense_filter = "AND MONTH(date)=MONTH(CURDATE())"
 
-    cur.execute(
-        f"SELECT COALESCE(SUM(amount),0) AS total FROM income WHERE user_id=%s {income_filter}",
-        (user_id,)
-    )
-    income = float(cur.fetchone()['total'])
+    cur.execute(f"SELECT COALESCE(SUM(amount),0) t FROM income WHERE user_id=%s {income_filter}", (user_id,))
+    income = float(cur.fetchone()['t'])
 
-    cur.execute(
-        f"SELECT COALESCE(SUM(amount),0) AS total FROM expenses WHERE user_id=%s {expense_filter}",
-        (user_id,)
-    )
-    expenses = float(cur.fetchone()['total'])
-
-    cur.execute(
-        "SELECT COUNT(*) AS total FROM activities WHERE user_id=%s",
-        (user_id,)
-    )
-    act = cur.fetchone()['total']
-
-    db.close()
+    cur.execute(f"SELECT COALESCE(SUM(amount),0) t FROM expenses WHERE user_id=%s {expense_filter}", (user_id,))
+    expenses = float(cur.fetchone()['t'])
 
     balance = income - expenses
 
-    notif = "<div style='padding:10px;background:green;color:white'>OK</div>"
+    cur.execute("SELECT COUNT(*) c FROM activities WHERE user_id=%s", (user_id,))
+    act = cur.fetchone()['c']
+
+    db.close()
+
+    notif = "<div style='padding:10px;background:green;color:white;border-radius:8px'>System OK</div>"
     if balance < 0:
-        notif = "<div style='padding:10px;background:red;color:white'>LOW BALANCE ⚠</div>"
+        notif = "<div style='padding:10px;background:red;color:white;border-radius:8px'>Low Balance Warning ⚠</div>"
 
     return f"""
 <!DOCTYPE html>
 <html>
 <head>
 <title>Dashboard</title>
-
 <style>
-body {{
-margin:0;
-font-family:Arial;
-background:#f4f6fb;
-}}
-
-.header {{
-background:linear-gradient(90deg,#4e54c8,#8f94fb);
-color:white;
-padding:20px;
-text-align:center;
-font-size:22px;
-font-weight:bold;
-}}
-
-.card {{
-background:white;
-margin:15px;
-padding:18px;
-border-radius:15px;
-box-shadow:0 4px 10px rgba(0,0,0,0.08);
-}}
-
-a {{
-text-decoration:none;
-color:black;
-}}
+body{{margin:0;font-family:Arial;background:#f4f6fb}}
+.header{{background:linear-gradient(90deg,#4e54c8,#8f94fb);color:white;padding:20px;text-align:center;font-size:22px;font-weight:bold;}}
+.card{{background:white;margin:15px;padding:18px;border-radius:15px;box-shadow:0 4px 10px rgba(0,0,0,0.08);}}
+.summary{{margin:15px;background:white;padding:15px;border-radius:15px;}}
+.box{{width:32%;padding:12px;border-radius:10px;color:white;text-align:center}}
+.income-box{{background:#28a745}}
+.expense-box{{background:#dc3545}}
+.balance-box{{background:#007bff}}
+a{{text-decoration:none;color:black}}
 </style>
 </head>
-
 <body>
 
 <div class="header">HIRWA SMART</div>
-
 {notif}
 
 <div class="card">
 <h3>Menu</h3>
-<a href="/income">💰 Income</a><br><br>
+<a href="/income">💰 Income</a><br>
+<a href="/expenses">💸 Expenses</a><br>
+<a href="/activities">📋 Activities</a><br>
 <a href="/logout">🚪 Logout</a>
 </div>
 
 <div class="card">
-
 <form method="GET">
 <select name="filter">
 <option value="all">All</option>
@@ -211,14 +303,15 @@ color:black;
 </select>
 <button>Filter</button>
 </form>
-
 </div>
 
-<div class="card">
+<div class="summary">
 <h3>Summary</h3>
-<p>Income: {income}</p>
-<p>Expenses: {expenses}</p>
-<p>Balance: {balance}</p>
+<div style="display:flex;justify-content:space-between">
+<div class="box income-box">Income<br>{income}</div>
+<div class="box expense-box">Expenses<br>{expenses}</div>
+<div class="box balance-box">Balance<br>{balance}</div>
+</div>
 <p>Activities: {act}</p>
 </div>
 
