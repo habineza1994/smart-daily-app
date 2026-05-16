@@ -1,29 +1,27 @@
-# ================= IMPORTS =================
+# ================= HIRWA SMART PRO VERSION (FULL RESTORED + DESIGN FIXED) =================
+
 import os
 import io
 import datetime
 import pymysql
-
 from flask import Flask, request, redirect, session, send_file
+from werkzeug.security import generate_password_hash, check_password_hash
 from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib.pagesizes import A4
-
 from ai_engine import analyze_finance
-
 
 # ================= APP =================
 app = Flask(__name__)
 
-app.secret_key = os.environ.get("SECRET_KEY", "hirwa_secret_key")
-
-
-# ================= SESSION SECURITY =================
+# ================= SECURITY =================
+app.secret_key = os.environ.get("SECRET_KEY", "hirwa_secret_key_change_this")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = True
+app.permanent_session_lifetime = datetime.timedelta(minutes=30)
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
-
-# ================= DATABASE =================
+# ================= DB =================
 def get_db():
     return pymysql.connect(
         host=os.environ.get("MYSQLHOST"),
@@ -35,221 +33,188 @@ def get_db():
         ssl={"ssl": {}}
     )
 
+# ================= INIT DB =================
+@app.route("/initdb")
+def init_db():
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(100) UNIQUE,
+        password VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS income(
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        amount DECIMAL(10,2),
+        source VARCHAR(255),
+        date DATE,
+        description TEXT,
+        done_by VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'approved',
+        user_id INT,
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS expenses(
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        amount DECIMAL(10,2),
+        category VARCHAR(255),
+        date DATE,
+        description TEXT,
+        done_by VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'approved',
+        user_id INT,
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS activities(
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        activity_name VARCHAR(255),
+        description TEXT,
+        status VARCHAR(50),
+        date DATE,
+        done_by VARCHAR(100),
+        user_id INT,
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    db.commit()
+    db.close()
+    return "Database Ready ✅"
+
 # ================= HOME =================
 @app.route("/")
 def home():
     return """
-    <h1>HIRWA SMART</h1>
-    <p>System Running ✅</p>
-    <a href="/login">Login</a>
+    <html>
+    <head>
+    <style>
+    body{font-family:Arial;background:linear-gradient(120deg,#4e54c8,#8f94fb);color:white;text-align:center;padding-top:80px}
+    .card{background:white;color:black;width:320px;margin:auto;padding:25px;border-radius:15px;box-shadow:0 10px 25px rgba(0,0,0,0.3)}
+    a{display:block;margin:10px;padding:10px;background:#4e54c8;color:white;text-decoration:none;border-radius:10px}
+    </style>
+    </head>
+    <body>
+    <div class='card'>
+    <h2>HIRWA SMART PRO</h2>
+    <a href='/login'>Login</a>
+    <a href='/register'>Register</a>
+    </div>
+    </body>
+    </html>
     """
 
-@app.route("/login", methods=["GET","POST"])
-def login():
-
+# ================= REGISTER =================
+@app.route("/register", methods=["GET","POST"])
+def register():
     if request.method == "POST":
-        try:
-            username = request.form.get("username","").strip()
-            password = request.form.get("password","").strip()
+        username = request.form["username"].strip()
+        password = generate_password_hash(request.form["password"].strip())
 
-            db = get_db()
-            cur = db.cursor()
-
-            cur.execute(
-                "SELECT * FROM users WHERE username=%s",
-                (username,)
-            )
-
-            user = cur.fetchone()
-            db.close()
-
-            if user and user["password"] == password:
-                session["user_id"] = user["id"]
-                session["username"] = user["username"]
-                return redirect("/dashboard")
-
-            return """
-            <div style="color:white;background:red;padding:10px;text-align:center;">
-                Login Failed ❌ Username cyangwa Password si byo
-            </div>
-            """
-
-
-        except Exception as e:
-            return f"<h3 style='color:red;'>Server Error: {str(e)}</h3>"
-
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("INSERT INTO users(username,password) VALUES(%s,%s)", (username,password))
+        db.commit()
+        db.close()
+        return redirect("/login")
 
     return """
-<!DOCTYPE html>
-<html>
-<head>
-<title>HIRWA SMART Login</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <html><body style='font-family:Arial;background:#f4f6fb;display:flex;justify-content:center;align-items:center;height:100vh'>
+    <div style='background:white;padding:25px;border-radius:15px;width:300px;box-shadow:0 10px 20px rgba(0,0,0,0.2)'>
+    <h2>Register</h2>
+    <form method='POST'>
+    <input name='username' placeholder='Username' style='width:100%;padding:10px;margin:5px 0'><br>
+    <input name='password' type='password' placeholder='Password' style='width:100%;padding:10px;margin:5px 0'><br>
+    <button style='width:100%;padding:10px;background:#4e54c8;color:white;border:none'>Register</button>
+    </form>
+    </div>
+    </body></html>
+    """
 
-<style>
-body {
-    margin:0;
-    font-family:Arial;
-    background: linear-gradient(135deg,#4e54c8,#8f94fb);
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-}
+# ================= LOGIN =================
+@app.route("/login", methods=["GET","POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
 
-.card {
-    background:white;
-    width:90%;
-    max-width:420px;
-    padding:30px;
-    border-radius:18px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.2);
-    text-align:center;
-}
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("SELECT * FROM users WHERE username=%s", (username,))
+        user = cur.fetchone()
+        db.close()
 
-h2 {
-    margin-bottom:10px;
-    color:#4e54c8;
-}
+        if user and check_password_hash(user["password"], password):
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+            return redirect("/dashboard")
 
-p {
-    color:#666;
-    margin-bottom:20px;
-}
+        return "Login Failed ❌"
 
-input {
-    width:100%;
-    padding:14px;
-    margin:10px 0;
-    border-radius:10px;
-    border:1px solid #ddd;
-    outline:none;
-}
+    return """
+    <html><body style='font-family:Arial;background:linear-gradient(120deg,#4e54c8,#8f94fb);display:flex;justify-content:center;align-items:center;height:100vh'>
+    <div style='background:white;padding:25px;border-radius:15px;width:300px'>
+    <h2>Login</h2>
+    <form method='POST'>
+    <input name='username' placeholder='Username' style='width:100%;padding:10px;margin:5px 0'><br>
+    <input name='password' type='password' placeholder='Password' style='width:100%;padding:10px;margin:5px 0'><br>
+    <button style='width:100%;padding:10px;background:#4e54c8;color:white;border:none'>Login</button>
+    </form>
+    </div>
+    </body></html>
+    """
 
-input:focus {
-    border-color:#4e54c8;
-}
+# ================= DASHBOARD =================
+@app.route("/dashboard")
+def dashboard():
+    if 'user_id' not in session:
+        return redirect('/login')
 
-button {
-    width:100%;
-    padding:14px;
-    border:none;
-    border-radius:10px;
-    background:#4e54c8;
-    color:white;
-    font-size:16px;
-    cursor:pointer;
-}
-
-button:hover {
-    background:#3b42a0;
-}
-
-.footer {
-    margin-top:15px;
-    font-size:12px;
-    color:#999;
-}
-</style>
-
-</head>
-
-<body>
-
-<div class="card">
-
-<h2>HIRWA SMART</h2>
-<p>Login to your account</p>
-
-<form method="POST">
-
-<input name="username" placeholder="Username" required>
-<input name="password" type="password" placeholder="Password" required>
-
-<button type="submit">LOGIN</button>
-
-</form>
-
-<div class="footer">
-Secure Finance System © 2026
-</div>
-
-</div>
-
-</body>
-</html>
-"""
-
+    return f"""
+    <html>
+    <head>
+    <style>
+    body{{margin:0;font-family:Arial;background:#f4f6fb}}
+    .header{{background:linear-gradient(90deg,#4e54c8,#8f94fb);color:white;padding:20px;text-align:center;font-size:22px}}
+    .card{{background:white;margin:15px;padding:20px;border-radius:15px;box-shadow:0 4px 10px rgba(0,0,0,0.1)}}
+    a{{display:block;padding:10px;color:#4e54c8;text-decoration:none}}
+    </style>
+    </head>
+    <body>
+    <div class='header'>HIRWA SMART PRO</div>
+    <div class='card'>Welcome {session['username']}</div>
+    <div class='card'>
+    <a href='/income'>💰 Income</a>
+    <a href='/expenses'>💸 Expenses</a>
+    <a href='/activity'>📋 Activities</a>
+    <a href='/ai_advice'>🧠 AI Advice</a>
+    <a href='/logout'>🚪 Logout</a>
+    </div>
+    </body>
+    </html>
+    """
 
 # ================= LOGOUT =================
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/login")
-
-
-# ================= DASHBOARD =================
-@app.route("/dashboard")
-def dashboard():
-
-    if "user_id" not in session:
-        return redirect("/login")
-
-    uid = session["user_id"]
-    db = get_db()
-    cur = db.cursor()
-
-    cur.execute("SELECT COALESCE(SUM(amount),0) t FROM income WHERE user_id=%s", (uid,))
-    income = float(cur.fetchone()["t"])
-
-    cur.execute("SELECT COALESCE(SUM(amount),0) t FROM expenses WHERE user_id=%s", (uid,))
-    expenses = float(cur.fetchone()["t"])
-
-    cur.execute("SELECT COUNT(*) c FROM activities WHERE user_id=%s", (uid,))
-    act = cur.fetchone()["c"]
-
-    balance = income - expenses
-
-    notif = "<div style='padding:10px;background:green;color:white'>OK</div>"
-    if balance < 0:
-        notif = "<div style='padding:10px;background:red;color:white'>LOW BALANCE ⚠</div>"
-
-    return f"""
-    <html>
-    <head>
-    <style>
-    body{{font-family:Arial;background:#f4f6fb}}
-    .header{{background:#4e54c8;color:white;padding:20px;text-align:center}}
-    .card{{background:white;margin:15px;padding:15px;border-radius:10px}}
-    a{{text-decoration:none}}
-    </style>
-    </head>
-
-    <body>
-
-    <div class="header">HIRWA SMART</div>
-
-    {notif}
-
-    <div class="card">
-    <a href="/income">Income</a><br>
-    <a href="/expenses">Expenses</a><br>
-    <a href="/activity">Activities</a><br>
-    <a href="/ai_advice">AI Advice</a><br>
-    <a href="/logout">Logout</a>
-    </div>
-
-    <div class="card">
-    <h3>Summary</h3>
-    Income: {income}<br>
-    Expenses: {expenses}<br>
-    Balance: {balance}<br>
-    Activities: {act}
-    </div>
-
-    </body>
-    </html>
-    """
 
 
 # ================= INCOME =================
