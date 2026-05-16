@@ -1,16 +1,112 @@
 # ================= IMPORTS =================
-import os 
-from ai_engine import analyze_finance
+import os
+import io
 import datetime
 import pymysql
-from flask import Flask, request, redirect, session, send_file
 
+from ai_engine import analyze_finance
+from flask import Flask, request, redirect, session, send_file
 from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib.pagesizes import A4
 
-app = Flask(__name__)
-app.secret_key = "hirwa_secret_key"
 
+# ================= APP =================
+app = Flask(__name__)
+
+
+# ================= SECURITY =================
+
+# Secret Key (Render Environment Variable)
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "hirwa_secret_key_change_this"
+)
+
+# Session security
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+# Session timeout (30 minutes)
+app.permanent_session_lifetime = datetime.timedelta(minutes=30)
+
+# Maximum upload size (16MB)
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+
+
+# ================= DATABASE =================
+
+def get_db():
+
+    return pymysql.connect(
+
+        host=os.environ.get(
+            "MYSQLHOST"
+        ),
+
+        user=os.environ.get(
+            "MYSQLUSER"
+        ),
+
+        password=os.environ.get(
+            "MYSQLPASSWORD"
+        ),
+
+        database=os.environ.get(
+            "MYSQLDATABASE"
+        ),
+
+        port=int(
+            os.environ.get(
+                "MYSQLPORT",
+                3306
+            )
+        ),
+
+        cursorclass=pymysql.cursors.DictCursor,
+
+        ssl={
+            "ssl": {}
+        }
+
+    )
+
+
+# ================= OPTIONAL VARIABLES =================
+
+APP_NAME = os.environ.get(
+    "APP_NAME",
+    "HIRWA SMART"
+)
+
+APP_EMAIL = os.environ.get(
+    "APP_EMAIL",
+    "admin@example.com"
+)
+
+DEBUG_MODE = os.environ.get(
+    "DEBUG",
+    "False"
+).lower() == "true"
+
+
+# ================= TEST ROUTE =================
+@app.route("/")
+def home():
+
+    return f"""
+
+    <h1>{APP_NAME}</h1>
+
+    <p>System Running ✅</p>
+
+    <p>Email: {APP_EMAIL}</p>
+
+    <p>Debug Mode:
+    {DEBUG_MODE}
+    </p>
+
+    """
 
 # ================= DB =================
 def get_db():
