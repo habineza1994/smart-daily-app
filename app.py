@@ -35,7 +35,6 @@ def get_db():
         ssl={"ssl": {}}
     )
 
-
 # ================= HOME =================
 @app.route("/")
 def home():
