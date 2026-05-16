@@ -45,47 +45,141 @@ def home():
     <a href="/login">Login</a>
     """
 
-
-# ================= LOGIN =================
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET","POST"])
 def login():
 
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+        try:
+            username = request.form.get("username","").strip()
+            password = request.form.get("password","").strip()
 
-        db = get_db()
-        cur = db.cursor()
+            db = get_db()
+            cur = db.cursor()
 
-        cur.execute("SELECT * FROM users WHERE username=%s", (username,))
-        user = cur.fetchone()
+            cur.execute(
+                "SELECT * FROM users WHERE username=%s",
+                (username,)
+            )
 
-        db.close()
+            user = cur.fetchone()
+            db.close()
 
-        if user and user["password"] == password:
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
-            return redirect("/dashboard")
+            if user and user["password"] == password:
+                session["user_id"] = user["id"]
+                session["username"] = user["username"]
+                return redirect("/dashboard")
 
-        return "Login Failed ❌"
+            return """
+            <div style="color:white;background:red;padding:10px;text-align:center;">
+                Login Failed ❌ Username cyangwa Password si byo
+            </div>
+            """
+
+
+        except Exception as e:
+            return f"<h3 style='color:red;'>Server Error: {str(e)}</h3>"
+
 
     return """
-    <style>
-    body{font-family:Arial;background:linear-gradient(120deg,#4e54c8,#8f94fb);display:flex;justify-content:center;align-items:center;height:100vh}
-    .card{background:white;padding:25px;border-radius:15px;width:350px}
-    input,button{width:100%;padding:12px;margin:8px 0}
-    button{background:#4e54c8;color:white;border:none;border-radius:8px}
-    </style>
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <div class="card">
-    <h2>Login</h2>
-    <form method="POST">
-    <input name="username" placeholder="Username">
-    <input name="password" type="password" placeholder="Password">
-    <button>Login</button>
-    </form>
-    </div>
-    """
+<style>
+body {
+    margin:0;
+    font-family:Arial;
+    background: linear-gradient(135deg,#4e54c8,#8f94fb);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.card {
+    background:white;
+    width:90%;
+    max-width:420px;
+    padding:30px;
+    border-radius:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.2);
+    text-align:center;
+}
+
+h2 {
+    margin-bottom:10px;
+    color:#4e54c8;
+}
+
+p {
+    color:#666;
+    margin-bottom:20px;
+}
+
+input {
+    width:100%;
+    padding:14px;
+    margin:10px 0;
+    border-radius:10px;
+    border:1px solid #ddd;
+    outline:none;
+}
+
+input:focus {
+    border-color:#4e54c8;
+}
+
+button {
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#4e54c8;
+    color:white;
+    font-size:16px;
+    cursor:pointer;
+}
+
+button:hover {
+    background:#3b42a0;
+}
+
+.footer {
+    margin-top:15px;
+    font-size:12px;
+    color:#999;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>HIRWA SMART</h2>
+<p>Login to your account</p>
+
+<form method="POST">
+
+<input name="username" placeholder="Username" required>
+<input name="password" type="password" placeholder="Password" required>
+
+<button type="submit">LOGIN</button>
+
+</form>
+
+<div class="footer">
+Secure Finance System © 2026
+</div>
+
+</div>
+
+</body>
+</html>
+"""
 
 
 # ================= LOGOUT =================
