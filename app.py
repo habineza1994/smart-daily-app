@@ -473,6 +473,7 @@ def dashboard():
 <head>
 <title>HIRWA SMART Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 
@@ -708,7 +709,63 @@ Welcome, {session.get('username')}
 
 </div>
 
+<div style="
+background:white;
+padding:20px;
+margin-top:20px;
+border-radius:20px;
+box-shadow:0 5px 15px rgba(0,0,0,.08);
+">
+
+<h3>
+📈 Financial Overview
+</h3>
+
+<canvas id="financeChart"></canvas>
+
 </div>
+
+<script>
+
+new Chart(
+document.getElementById("financeChart"),
+{
+type:"bar",
+
+data:{
+
+labels:[
+"Income",
+"Expenses",
+"Balance"
+],
+
+datasets:[{
+label:"Amount",
+
+data:[
+{income},
+{expenses},
+{balance}
+]
+
+}]
+},
+
+options:{
+responsive:true
+}
+
+}
+)
+
+</script>
+
+</div>
+
+</body>
+</html>
+"""
 
 </div>
 
