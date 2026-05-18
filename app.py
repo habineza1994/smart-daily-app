@@ -559,20 +559,126 @@ margin-top:20px;
 
 <body>
 
+<div style="display:flex;min-height:100vh;">
+
+<!-- Sidebar -->
+
+<div style="
+width:260px;
+background:linear-gradient(180deg,#4e54c8,#6c63ff);
+color:white;
+padding:25px;
+">
+
+<h2 style="margin-bottom:30px;">
+HIRWA SMART
+</h2>
+
+<p style="
+margin-bottom:25px;
+opacity:.8;
+">
+👤 {session.get('username')}
+</p>
+
+<a href="/dashboard"
+style="
+display:block;
+padding:14px;
+margin:10px 0;
+background:rgba(255,255,255,.15);
+border-radius:12px;
+color:white;
+text-decoration:none;
+">
+🏠 Dashboard
+</a>
+
+<a href="/income"
+style="
+display:block;
+padding:14px;
+margin:10px 0;
+background:rgba(255,255,255,.15);
+border-radius:12px;
+color:white;
+text-decoration:none;
+">
+💰 Income
+</a>
+
+<a href="/expenses"
+style="
+display:block;
+padding:14px;
+margin:10px 0;
+background:rgba(255,255,255,.15);
+border-radius:12px;
+color:white;
+text-decoration:none;
+">
+💸 Expenses
+</a>
+
+<a href="/activity"
+style="
+display:block;
+padding:14px;
+margin:10px 0;
+background:rgba(255,255,255,.15);
+border-radius:12px;
+color:white;
+text-decoration:none;
+">
+📋 Activities
+</a>
+
+<a href="/ai_advice"
+style="
+display:block;
+padding:14px;
+margin:10px 0;
+background:rgba(255,255,255,.15);
+border-radius:12px;
+color:white;
+text-decoration:none;
+">
+🧠 AI Advice
+</a>
+
+<a href="/logout"
+style="
+display:block;
+padding:14px;
+margin:10px 0;
+background:#ff4d4d;
+border-radius:12px;
+color:white;
+text-decoration:none;
+">
+🚪 Logout
+</a>
+
+</div>
+
+<!-- Main -->
+
+<div style="flex:1;padding:25px;">
+
 <div class="header">
 
 <div>
-<h2>HIRWA SMART</h2>
+<h2>Dashboard</h2>
 <div class="user">
 Welcome, {session.get('username')}
 </div>
 </div>
 
-<div>🔔</div>
-
+<div>
+🔔
 </div>
 
-<div class="container">
+</div>
 
 <div class="notif">
 {notif}
@@ -601,16 +707,6 @@ Welcome, {session.get('username')}
 </div>
 
 </div>
-
-<div class="menu">
-
-<h3>Menu</h3>
-
-<a href="/income">💰 Income Management</a>
-<a href="/expenses">💸 Expenses</a>
-<a href="/activity">📋 Activities</a>
-<a href="/ai_advice">🧠 AI Advice</a>
-<a href="/logout">🚪 Logout</a>
 
 </div>
 
