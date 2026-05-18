@@ -410,8 +410,62 @@ document.querySelector(
 # ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
+
     if 'user_id' not in session:
         return redirect('/login')
+
+    user_id = session['user_id']
+
+    db = get_db()
+    cur = db.cursor()
+
+    # Income total
+    cur.execute(
+        "SELECT COALESCE(SUM(amount),0) t FROM income WHERE user_id=%s",
+        (user_id,)
+    )
+    income = float(cur.fetchone()['t'])
+
+    # Expense total
+    cur.execute(
+        "SELECT COALESCE(SUM(amount),0) t FROM expenses WHERE user_id=%s",
+        (user_id,)
+    )
+    expenses = float(cur.fetchone()['t'])
+
+    # Balance
+    balance = income - expenses
+
+    # Activities count
+    cur.execute(
+        "SELECT COUNT(*) c FROM activities WHERE user_id=%s",
+        (user_id,)
+    )
+    act = cur.fetchone()['c']
+
+    db.close()
+
+    # Notification
+    notif = """
+    <div style="
+    background:#d4edda;
+    color:#155724;
+    padding:12px;
+    border-radius:10px;">
+    ✅ System Running Normally
+    </div>
+    """
+
+    if balance < 0:
+        notif = """
+        <div style="
+        background:#f8d7da;
+        color:#721c24;
+        padding:12px;
+        border-radius:10px;">
+        ⚠ Low Balance Warning
+        </div>
+        """
 
     return f"""
 <!DOCTYPE html>
@@ -435,9 +489,7 @@ background:#f4f6fb;
 
 .header{{
 background:linear-gradient(
-90deg,
-#4e54c8,
-#8f94fb
+90deg,#4e54c8,#8f94fb
 );
 padding:20px;
 color:white;
@@ -470,29 +522,17 @@ box-shadow:
 0 8px 20px rgba(0,0,0,.1);
 }}
 
-.income{{
-background:#28a745;
-}}
-
-.expense{{
-background:#dc3545;
-}}
-
-.balance{{
-background:#007bff;
-}}
-
-.activity{{
-background:#ff9800;
-}}
+.income{{background:#28a745;}}
+.expense{{background:#dc3545;}}
+.balance{{background:#007bff;}}
+.activity{{background:#ff9800;}}
 
 .menu{{
 margin-top:25px;
 background:white;
 padding:20px;
 border-radius:20px;
-box-shadow:
-0 5px 15px rgba(0,0,0,.08);
+box-shadow:0 5px 15px rgba(0,0,0,.08);
 }}
 
 .menu a{{
@@ -515,7 +555,6 @@ margin-top:20px;
 }}
 
 </style>
-
 </head>
 
 <body>
@@ -525,57 +564,40 @@ margin-top:20px;
 <div>
 <h2>HIRWA SMART</h2>
 <div class="user">
-Welcome,
-{session.get('username')}
+Welcome, {session.get('username')}
 </div>
 </div>
 
-<div>
-🔔
-</div>
+<div>🔔</div>
 
 </div>
 
 <div class="container">
 
 <div class="notif">
-
 {notif}
-
 </div>
 
 <div class="cards">
 
 <div class="card income">
-
 <h3>💰 Income</h3>
-
 <h2>{income}</h2>
-
 </div>
 
 <div class="card expense">
-
 <h3>💸 Expenses</h3>
-
 <h2>{expenses}</h2>
-
 </div>
 
 <div class="card balance">
-
 <h3>📊 Balance</h3>
-
 <h2>{balance}</h2>
-
 </div>
 
 <div class="card activity">
-
 <h3>📋 Activities</h3>
-
 <h2>{act}</h2>
-
 </div>
 
 </div>
@@ -584,25 +606,11 @@ Welcome,
 
 <h3>Menu</h3>
 
-<a href="/income">
-💰 Income Management
-</a>
-
-<a href="/expenses">
-💸 Expenses
-</a>
-
-<a href="/activity">
-📋 Activities
-</a>
-
-<a href="/ai_advice">
-🧠 AI Advice
-</a>
-
-<a href="/logout">
-🚪 Logout
-</a>
+<a href="/income">💰 Income Management</a>
+<a href="/expenses">💸 Expenses</a>
+<a href="/activity">📋 Activities</a>
+<a href="/ai_advice">🧠 AI Advice</a>
+<a href="/logout">🚪 Logout</a>
 
 </div>
 
@@ -611,7 +619,6 @@ Welcome,
 </body>
 </html>
 """
-
 # ================= LOGOUT =================
 @app.route("/logout")
 def logout():
