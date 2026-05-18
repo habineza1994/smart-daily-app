@@ -419,60 +419,69 @@ def dashboard():
     db = get_db()
     cur = db.cursor()
 
-    # Income total
+    # Income
     cur.execute(
         "SELECT COALESCE(SUM(amount),0) t FROM income WHERE user_id=%s",
         (user_id,)
     )
     income = float(cur.fetchone()['t'])
 
-    # Expense total
+    # Expenses
     cur.execute(
         "SELECT COALESCE(SUM(amount),0) t FROM expenses WHERE user_id=%s",
         (user_id,)
     )
     expenses = float(cur.fetchone()['t'])
 
-    # Balance
     balance = income - expenses
 
-    # Activities count
+    # Activities
     cur.execute(
         "SELECT COUNT(*) c FROM activities WHERE user_id=%s",
         (user_id,)
     )
+
     act = cur.fetchone()['c']
 
     db.close()
 
-    # Notification
     notif = """
     <div style="
     background:#d4edda;
     color:#155724;
     padding:12px;
-    border-radius:10px;">
+    border-radius:10px;
+    margin-bottom:20px;">
     ✅ System Running Normally
     </div>
     """
 
     if balance < 0:
+
         notif = """
         <div style="
         background:#f8d7da;
         color:#721c24;
         padding:12px;
-        border-radius:10px;">
+        border-radius:10px;
+        margin-bottom:20px;">
         ⚠ Low Balance Warning
         </div>
         """
 
     return f"""
+
 <!DOCTYPE html>
+
 <html>
+
 <head>
-<title>HIRWA SMART Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>HIRWA SMART</title>
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1">
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -481,198 +490,195 @@ def dashboard():
 margin:0;
 padding:0;
 box-sizing:border-box;
-font-family:Arial,sans-serif;
+font-family:Arial;
 }}
 
 body{{
 background:#f4f6fb;
 }}
 
+.wrapper{{
+display:flex;
+min-height:100vh;
+}}
+
+.sidebar{{
+width:260px;
+background:linear-gradient(
+180deg,
+#4e54c8,
+#6c63ff
+);
+
+padding:25px;
+color:white;
+}}
+
+.sidebar h2{{
+margin-bottom:25px;
+}}
+
+.sidebar a{{
+display:block;
+padding:15px;
+margin:10px 0;
+background:rgba(
+255,255,255,.15
+);
+
+color:white;
+text-decoration:none;
+border-radius:12px;
+transition:.3s;
+}}
+
+.sidebar a:hover{{
+background:rgba(
+255,255,255,.3
+);
+}}
+
+.logout{{
+background:#ff4d4d !important;
+}}
+
+.main{{
+flex:1;
+padding:25px;
+}}
+
 .header{{
 background:linear-gradient(
-90deg,#4e54c8,#8f94fb
+90deg,
+#4e54c8,
+#8f94fb
 );
+
 padding:20px;
+border-radius:20px;
 color:white;
 display:flex;
 justify-content:space-between;
 align-items:center;
 }}
 
-.user{{
-font-size:14px;
-}}
-
-.container{{
-padding:20px;
-}}
-
 .cards{{
 display:grid;
 grid-template-columns:
-repeat(auto-fit,minmax(220px,1fr));
+repeat(auto-fit,minmax(
+220px,1fr));
+
 gap:15px;
 margin-top:20px;
 }}
 
 .card{{
 padding:25px;
-border-radius:18px;
+border-radius:20px;
 color:white;
 box-shadow:
-0 8px 20px rgba(0,0,0,.1);
+0 10px 25px rgba(
+0,0,0,.1
+);
+
+transition:.3s;
 }}
 
-.income{{background:#28a745;}}
-.expense{{background:#dc3545;}}
-.balance{{background:#007bff;}}
-.activity{{background:#ff9800;}}
+.card:hover{{
+transform:translateY(-5px);
+}}
 
-.menu{{
+.income{{
+background:#28a745;
+}}
+
+.expense{{
+background:#dc3545;
+}}
+
+.balance{{
+background:#007bff;
+}}
+
+.activity{{
+background:#ff9800;
+}}
+
+.chart-box{{
 margin-top:25px;
 background:white;
 padding:20px;
 border-radius:20px;
-box-shadow:0 5px 15px rgba(0,0,0,.08);
+box-shadow:
+0 5px 15px rgba(
+0,0,0,.08
+);
 }}
 
-.menu a{{
-display:block;
-padding:14px;
-margin:10px 0;
-text-decoration:none;
-background:#f4f6fb;
-border-radius:12px;
-color:black;
-font-weight:bold;
-}}
-
-.menu a:hover{{
-background:#e4e7ff;
-}}
-
-.notif{{
-margin-top:20px;
+canvas{{
+height:350px !important;
 }}
 
 </style>
+
 </head>
 
 <body>
 
-<div style="display:flex;min-height:100vh;">
+<div class="wrapper">
 
-<!-- Sidebar -->
+<div class="sidebar">
 
-<div style="
-width:260px;
-background:linear-gradient(180deg,#4e54c8,#6c63ff);
-color:white;
-padding:25px;
-">
+<h2>HIRWA SMART</h2>
 
-<h2 style="margin-bottom:30px;">
-HIRWA SMART
-</h2>
-
-<p style="
-margin-bottom:25px;
-opacity:.8;
-">
+<p>
 👤 {session.get('username')}
 </p>
 
-<a href="/dashboard"
-style="
-display:block;
-padding:14px;
-margin:10px 0;
-background:rgba(255,255,255,.15);
-border-radius:12px;
-color:white;
-text-decoration:none;
-">
+<br>
+
+<a href="/dashboard">
 🏠 Dashboard
 </a>
 
-<a href="/income"
-style="
-display:block;
-padding:14px;
-margin:10px 0;
-background:rgba(255,255,255,.15);
-border-radius:12px;
-color:white;
-text-decoration:none;
-">
+<a href="/income">
 💰 Income
 </a>
 
-<a href="/expenses"
-style="
-display:block;
-padding:14px;
-margin:10px 0;
-background:rgba(255,255,255,.15);
-border-radius:12px;
-color:white;
-text-decoration:none;
-">
+<a href="/expenses">
 💸 Expenses
 </a>
 
-<a href="/activity"
-style="
-display:block;
-padding:14px;
-margin:10px 0;
-background:rgba(255,255,255,.15);
-border-radius:12px;
-color:white;
-text-decoration:none;
-">
+<a href="/activity">
 📋 Activities
 </a>
 
-<a href="/ai_advice"
-style="
-display:block;
-padding:14px;
-margin:10px 0;
-background:rgba(255,255,255,.15);
-border-radius:12px;
-color:white;
-text-decoration:none;
-">
+<a href="/ai_advice">
 🧠 AI Advice
 </a>
 
 <a href="/logout"
-style="
-display:block;
-padding:14px;
-margin:10px 0;
-background:#ff4d4d;
-border-radius:12px;
-color:white;
-text-decoration:none;
-">
+class="logout">
 🚪 Logout
 </a>
 
 </div>
 
-<!-- Main -->
-
-<div style="flex:1;padding:25px;">
+<div class="main">
 
 <div class="header">
 
 <div>
-<h2>Dashboard</h2>
-<div class="user">
-Welcome, {session.get('username')}
-</div>
+
+<h2>
+Dashboard
+</h2>
+
+<p>
+Welcome,
+{session.get('username')}
+</p>
+
 </div>
 
 <div>
@@ -681,92 +687,123 @@ Welcome, {session.get('username')}
 
 </div>
 
-<div class="notif">
 {notif}
-</div>
 
 <div class="cards">
 
 <div class="card income">
-<h3>💰 Income</h3>
-<h2>{income}</h2>
+
+<h3>
+💰 Income
+</h3>
+
+<h1>
+{income}
+</h1>
+
 </div>
 
 <div class="card expense">
-<h3>💸 Expenses</h3>
-<h2>{expenses}</h2>
+
+<h3>
+💸 Expenses
+</h3>
+
+<h1>
+{expenses}
+</h1>
+
 </div>
 
 <div class="card balance">
-<h3>📊 Balance</h3>
-<h2>{balance}</h2>
+
+<h3>
+📊 Balance
+</h3>
+
+<h1>
+{balance}
+</h1>
+
 </div>
 
 <div class="card activity">
-<h3>📋 Activities</h3>
-<h2>{act}</h2>
-</div>
+
+<h3>
+📋 Activities
+</h3>
+
+<h1>
+{act}
+</h1>
 
 </div>
 
-<div style="
-background:white;
-padding:20px;
-margin-top:20px;
-border-radius:20px;
-box-shadow:0 5px 15px rgba(0,0,0,.08);
-">
+</div>
+
+<div class="chart-box">
 
 <h3>
 📈 Financial Overview
 </h3>
 
-<canvas id="financeChart"></canvas>
+<br>
+
+<canvas id="financeChart">
+</canvas>
+
+</div>
+
+</div>
 
 </div>
 
 <script>
 
+const ctx =
+document.getElementById(
+"financeChart"
+);
+
 new Chart(
-document.getElementById("financeChart"),
-{
+ctx,
+{{
 type:"bar",
 
-data:{
-
+data:{{
 labels:[
 "Income",
 "Expenses",
 "Balance"
 ],
 
-datasets:[{
-label:"Amount",
+datasets:[{{
+label:"RWF",
 
 data:[
 {income},
 {expenses},
 {balance}
 ]
+}}]
 
-}]
-},
+}},
 
-options:{
-responsive:true
-}
+options:{{
+responsive:true,
+maintainAspectRatio:false
+}}
 
-}
-)
+}}
+);
 
 </script>
 
-</div>
-
 </body>
-</html>
-"""
 
+</html>
+
+"""
 # ================= LOGOUT =================
 @app.route("/logout")
 def logout():
