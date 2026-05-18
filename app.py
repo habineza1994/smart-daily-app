@@ -156,13 +156,22 @@ def login():
 
         db = get_db()
         cur = db.cursor()
-        cur.execute("SELECT * FROM users WHERE username=%s", (username,))
+        cur.execute(
+            "SELECT * FROM users WHERE username=%s",
+            (username,)
+        )
+
         user = cur.fetchone()
         db.close()
 
-        if user and check_password_hash(user["password"], password):
+        if user and check_password_hash(
+            user["password"],
+            password
+        ):
+
             session["user_id"] = user["id"]
             session["username"] = user["username"]
+
             return redirect("/dashboard")
 
         return "Login Failed ❌"
@@ -188,7 +197,11 @@ height:100vh;
 display:flex;
 justify-content:center;
 align-items:center;
-background:linear-gradient(135deg,#4e54c8,#8f94fb);
+background:linear-gradient(
+135deg,
+#4e54c8,
+#8f94fb
+);
 padding:20px;
 }
 
@@ -198,7 +211,8 @@ width:100%;
 max-width:420px;
 padding:35px;
 border-radius:25px;
-box-shadow:0 15px 35px rgba(0,0,0,.2);
+box-shadow:
+0 15px 35px rgba(0,0,0,.2);
 }
 
 .logo{
@@ -218,6 +232,7 @@ font-size:14px;
 
 .input-box{
 margin-bottom:15px;
+position:relative;
 }
 
 input{
@@ -233,6 +248,17 @@ input:focus{
 border-color:#4e54c8;
 }
 
+.password-toggle{
+
+position:absolute;
+right:15px;
+top:14px;
+cursor:pointer;
+color:#4e54c8;
+font-size:13px;
+
+}
+
 button{
 width:100%;
 padding:14px;
@@ -246,6 +272,17 @@ cursor:pointer;
 
 button:hover{
 opacity:.9;
+}
+
+.forgot{
+text-align:right;
+margin-bottom:18px;
+}
+
+.forgot a{
+text-decoration:none;
+font-size:13px;
+color:#4e54c8;
 }
 
 .footer{
@@ -264,42 +301,112 @@ color:gray;
 <div class="card">
 
 <div class="logo">
+
 <h1>HIRWA SMART</h1>
-<p>Financial Management System</p>
+
+<p>
+Financial Management System
+</p>
+
 </div>
 
 <form method="POST">
 
 <div class="input-box">
-<input type="text"
+
+<input
+type="text"
 name="username"
 placeholder="Username"
 required>
+
 </div>
 
 <div class="input-box">
-<input type="password"
+
+<input
+id="password"
+type="password"
 name="password"
 placeholder="Password"
 required>
+
+<span
+class="password-toggle"
+onclick="togglePassword()">
+
+👁 Show
+
+</span>
+
+</div>
+
+<div class="forgot">
+
+<a href="/forgot_password">
+
+Forgot Password?
+
+</a>
+
 </div>
 
 <button type="submit">
+
 Login
+
 </button>
 
 </form>
 
 <div class="footer">
+
 Secure System v1.0
+
 </div>
 
 </div>
+
+<script>
+
+function togglePassword(){
+
+let pass =
+document.getElementById(
+"password"
+);
+
+if(
+pass.type==="password"
+){
+
+pass.type="text";
+
+document.querySelector(
+".password-toggle"
+).innerHTML=
+"🙈 Hide";
+
+}
+
+else{
+
+pass.type="password";
+
+document.querySelector(
+".password-toggle"
+).innerHTML=
+"👁 Show";
+
+}
+
+}
+
+</script>
 
 </body>
 </html>
 """
-
 # ================= DASHBOARD =================
 @app.route("/dashboard")
 def dashboard():
