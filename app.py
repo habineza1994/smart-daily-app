@@ -168,17 +168,137 @@ def login():
         return "Login Failed ❌"
 
     return """
-    <html><body style='font-family:Arial;background:linear-gradient(120deg,#4e54c8,#8f94fb);display:flex;justify-content:center;align-items:center;height:100vh'>
-    <div style='background:white;padding:25px;border-radius:15px;width:300px'>
-    <h2>Login</h2>
-    <form method='POST'>
-    <input name='username' placeholder='Username' style='width:100%;padding:10px;margin:5px 0'><br>
-    <input name='password' type='password' placeholder='Password' style='width:100%;padding:10px;margin:5px 0'><br>
-    <button style='width:100%;padding:10px;background:#4e54c8;color:white;border:none'>Login</button>
-    </form>
-    </div>
-    </body></html>
-    """
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
+body{
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+background:linear-gradient(135deg,#4e54c8,#8f94fb);
+padding:20px;
+}
+
+.card{
+background:white;
+width:100%;
+max-width:420px;
+padding:35px;
+border-radius:25px;
+box-shadow:0 15px 35px rgba(0,0,0,.2);
+}
+
+.logo{
+text-align:center;
+margin-bottom:25px;
+}
+
+.logo h1{
+color:#4e54c8;
+font-size:32px;
+}
+
+.logo p{
+color:gray;
+font-size:14px;
+}
+
+.input-box{
+margin-bottom:15px;
+}
+
+input{
+width:100%;
+padding:14px;
+border-radius:12px;
+border:1px solid #ddd;
+outline:none;
+font-size:15px;
+}
+
+input:focus{
+border-color:#4e54c8;
+}
+
+button{
+width:100%;
+padding:14px;
+border:none;
+border-radius:12px;
+background:#4e54c8;
+color:white;
+font-size:16px;
+cursor:pointer;
+}
+
+button:hover{
+opacity:.9;
+}
+
+.footer{
+margin-top:20px;
+text-align:center;
+font-size:13px;
+color:gray;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<div class="logo">
+<h1>HIRWA SMART</h1>
+<p>Financial Management System</p>
+</div>
+
+<form method="POST">
+
+<div class="input-box">
+<input type="text"
+name="username"
+placeholder="Username"
+required>
+</div>
+
+<div class="input-box">
+<input type="password"
+name="password"
+placeholder="Password"
+required>
+</div>
+
+<button type="submit">
+Login
+</button>
+
+</form>
+
+<div class="footer">
+Secure System v1.0
+</div>
+
+</div>
+
+</body>
+</html>
+"""
 
 # ================= DASHBOARD =================
 @app.route("/dashboard")
