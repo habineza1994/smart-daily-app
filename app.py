@@ -414,28 +414,203 @@ def dashboard():
         return redirect('/login')
 
     return f"""
-    <html>
-    <head>
-    <style>
-    body{{margin:0;font-family:Arial;background:#f4f6fb}}
-    .header{{background:linear-gradient(90deg,#4e54c8,#8f94fb);color:white;padding:20px;text-align:center;font-size:22px}}
-    .card{{background:white;margin:15px;padding:20px;border-radius:15px;box-shadow:0 4px 10px rgba(0,0,0,0.1)}}
-    a{{display:block;padding:10px;color:#4e54c8;text-decoration:none}}
-    </style>
-    </head>
-    <body>
-    <div class='header'>HIRWA SMART PRO</div>
-    <div class='card'>Welcome {session['username']}</div>
-    <div class='card'>
-    <a href='/income'>💰 Income</a>
-    <a href='/expenses'>💸 Expenses</a>
-    <a href='/activity'>📋 Activities</a>
-    <a href='/ai_advice'>🧠 AI Advice</a>
-    <a href='/logout'>🚪 Logout</a>
-    </div>
-    </body>
-    </html>
-    """
+<!DOCTYPE html>
+<html>
+<head>
+<title>HIRWA SMART Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+
+*{{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}}
+
+body{{
+background:#f4f6fb;
+}}
+
+.header{{
+background:linear-gradient(
+90deg,
+#4e54c8,
+#8f94fb
+);
+padding:20px;
+color:white;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}}
+
+.user{{
+font-size:14px;
+}}
+
+.container{{
+padding:20px;
+}}
+
+.cards{{
+display:grid;
+grid-template-columns:
+repeat(auto-fit,minmax(220px,1fr));
+gap:15px;
+margin-top:20px;
+}}
+
+.card{{
+padding:25px;
+border-radius:18px;
+color:white;
+box-shadow:
+0 8px 20px rgba(0,0,0,.1);
+}}
+
+.income{{
+background:#28a745;
+}}
+
+.expense{{
+background:#dc3545;
+}}
+
+.balance{{
+background:#007bff;
+}}
+
+.activity{{
+background:#ff9800;
+}}
+
+.menu{{
+margin-top:25px;
+background:white;
+padding:20px;
+border-radius:20px;
+box-shadow:
+0 5px 15px rgba(0,0,0,.08);
+}}
+
+.menu a{{
+display:block;
+padding:14px;
+margin:10px 0;
+text-decoration:none;
+background:#f4f6fb;
+border-radius:12px;
+color:black;
+font-weight:bold;
+}}
+
+.menu a:hover{{
+background:#e4e7ff;
+}}
+
+.notif{{
+margin-top:20px;
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+<div>
+<h2>HIRWA SMART</h2>
+<div class="user">
+Welcome,
+{session.get('username')}
+</div>
+</div>
+
+<div>
+🔔
+</div>
+
+</div>
+
+<div class="container">
+
+<div class="notif">
+
+{notif}
+
+</div>
+
+<div class="cards">
+
+<div class="card income">
+
+<h3>💰 Income</h3>
+
+<h2>{income}</h2>
+
+</div>
+
+<div class="card expense">
+
+<h3>💸 Expenses</h3>
+
+<h2>{expenses}</h2>
+
+</div>
+
+<div class="card balance">
+
+<h3>📊 Balance</h3>
+
+<h2>{balance}</h2>
+
+</div>
+
+<div class="card activity">
+
+<h3>📋 Activities</h3>
+
+<h2>{act}</h2>
+
+</div>
+
+</div>
+
+<div class="menu">
+
+<h3>Menu</h3>
+
+<a href="/income">
+💰 Income Management
+</a>
+
+<a href="/expenses">
+💸 Expenses
+</a>
+
+<a href="/activity">
+📋 Activities
+</a>
+
+<a href="/ai_advice">
+🧠 AI Advice
+</a>
+
+<a href="/logout">
+🚪 Logout
+</a>
+
+</div>
+
+</div>
+
+</body>
+</html>
+"""
 
 # ================= LOGOUT =================
 @app.route("/logout")
