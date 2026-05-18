@@ -767,11 +767,6 @@ responsive:true
 </html>
 """
 
-</div>
-
-</body>
-</html>
-"""
 # ================= LOGOUT =================
 @app.route("/logout")
 def logout():
