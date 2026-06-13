@@ -994,6 +994,8 @@ def income():
     if "user_id" not in session:
         return redirect("/login")
 
+    user_id = int(session["user_id"])
+
     db = get_db()
     cur = db.cursor()
 
@@ -1019,29 +1021,34 @@ def income():
             cur.execute("""
                 INSERT INTO income(amount, source, date, user_id)
                 VALUES (%s, %s, %s, %s)
-            """, (amount, source, date, session["user_id"]))
+            """, (amount, source, date, user_id))
 
             db.commit()
             return redirect("/income")
 
-        # ================= EDIT INCOME (LOAD) =================
+        # ================= EDIT LOAD =================
         edit_data = None
         edit_id = request.args.get("edit")
 
         if edit_id:
             cur.execute("""
                 SELECT * FROM income
-                WHERE id = %s AND user_id = %s AND deleted_at IS NULL
-            """, (edit_id, session["user_id"]))
+                WHERE id=%s AND user_id=%s AND deleted_at IS NULL
+            """, (edit_id, user_id))
             edit_data = cur.fetchone()
 
-        # ================= UPDATE INCOME =================
+        # ================= UPDATE =================
         if request.method == "POST" and "edit_id" in request.form:
 
             edit_id = request.form.get("edit_id")
             amount = request.form.get("amount", "").strip()
             source = request.form.get("source", "").strip()
             date = request.form.get("date", "").strip()
+
+            try:
+                amount = float(amount)
+            except:
+                return "<h3 style='color:red;text-align:center'>Invalid amount ❌</h3>"
 
             cur.execute("""
                 UPDATE income
@@ -1050,7 +1057,7 @@ def income():
                     date=%s,
                     updated_at=CURRENT_TIMESTAMP
                 WHERE id=%s AND user_id=%s
-            """, (amount, source, date, edit_id, session["user_id"]))
+            """, (amount, source, date, edit_id, user_id))
 
             db.commit()
             return redirect("/income")
@@ -1060,18 +1067,19 @@ def income():
         if delete_id:
             cur.execute("""
                 UPDATE income
-                SET deleted_at = CURRENT_TIMESTAMP
+                SET deleted_at=CURRENT_TIMESTAMP
                 WHERE id=%s AND user_id=%s
-            """, (delete_id, session["user_id"]))
+            """, (delete_id, user_id))
+
             db.commit()
             return redirect("/income")
 
-        # ================= FETCH INCOME =================
+        # ================= FETCH =================
         cur.execute("""
             SELECT * FROM income
             WHERE user_id=%s AND deleted_at IS NULL
             ORDER BY date DESC
-        """, (session["user_id"],))
+        """, (user_id,))
 
         rows = cur.fetchall()
 
@@ -1080,14 +1088,14 @@ def income():
             SELECT COALESCE(SUM(amount),0) AS total
             FROM income
             WHERE user_id=%s AND deleted_at IS NULL
-        """, (session["user_id"],))
+        """, (user_id,))
 
         total_income = cur.fetchone()["total"]
 
     except Exception as e:
         cur.close()
         db.close()
-        return f"<h3 style='color:red;text-align:center'>Error ❌ {str(e)}</h3>"
+        return f"<h3 style='color:red;text-align:center'>Error ❌ {e}</h3>"
 
     cur.close()
     db.close()
@@ -1157,11 +1165,9 @@ def income():
     .edit {{ color:green; }}
     .delete {{ color:red; }}
     </style>
-
     </head>
 
     <body>
-
     <div class="box">
 
     <h2>💰 Income PRO CRUD</h2>
@@ -1171,7 +1177,7 @@ def income():
     </div>
     """
 
-    # ================= EDIT FORM =================
+    # ================= FORM =================
     if edit_data:
         html += f"""
         <form method="POST">
