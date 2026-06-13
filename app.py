@@ -5,6 +5,8 @@ import io
 import datetime
 import psycopg2
 
+from psycopg2.extras import RealDictCursor
+
 from flask import Flask, request, redirect, session, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -46,12 +48,25 @@ app.config["SESSION_COOKIE_SECURE"] = True
 app.permanent_session_lifetime = datetime.timedelta(minutes=30)
 
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+
+
 # ================= SUPABASE DATABASE =================
+def get_db():
+    conn = psycopg2.connect(
+        os.environ["DATABASE_URL"],
+        sslmode="require",
+        cursor_factory=RealDictCursor
+    )
+    return conn
+# ================= SUPABASE DATABASE =================
+
+from psycopg2.extras import RealDictCursor
 
 def get_db():
     conn = psycopg2.connect(
         os.environ["DATABASE_URL"],
-        sslmode="require"
+        sslmode="require",
+        cursor_factory=RealDictCursor
     )
     return conn
 # ================= INIT DB (SUPABASE POSTGRESQL VERSION) =================
