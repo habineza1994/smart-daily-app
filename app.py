@@ -1,13 +1,24 @@
-# ================= HIRWA SMART PRO VERSION (FULL RESTORED + DESIGN FIXED) =================
+# ================= HIRWA SMART PRO VERSION (SUPABASE READY) =================
 
 import os
 import io
 import datetime
-import pymysql
+import psycopg2
+
 from flask import Flask, request, redirect, session, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
-from reportlab.platypus import SimpleDocTemplate, Table
+
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+    Paragraph,
+    Spacer
+)
+
 from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
 
 # Optional AI engine import (safe fallback)
 try:
@@ -20,46 +31,41 @@ except ImportError:
 app = Flask(__name__)
 
 # ================= SECURITY =================
-app.secret_key = os.environ.get("SECRET_KEY", "hirwa_secret_key_change_this")
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "hirwa_secret_key_change_this"
+)
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-
-# ⚠️ IMPORTANT:
-# Secure cookies should only be True in production (HTTPS)
-app.config["SESSION_COOKIE_SECURE"] = False  # change to True when deploying on HTTPS
+app.config["SESSION_COOKIE_SECURE"] = False
 
 app.permanent_session_lifetime = datetime.timedelta(minutes=30)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 
-# ================= DB =================
+# ================= SUPABASE DATABASE =================
 def get_db():
-    try:
-        connection = pymysql.connect(
-            host=os.environ.get("MYSQLHOST"),
-            user=os.environ.get("MYSQLUSER"),
-            password=os.environ.get("MYSQLPASSWORD"),
-            database=os.environ.get("MYSQLDATABASE"),
-            port=int(os.environ.get("MYSQLPORT", 3306)),
-            cursorclass=pymysql.cursors.DictCursor,
-            ssl={"ssl": {}}
-        )
-        return connection
-    except Exception as e:
-        print("Database connection error:", e)
-        return None
+    conn = psycopg2.connect(
+        host="YOUR_SUPABASE_HOST",
+        database="postgres",
+        user="postgres",
+        password="YOUR_SUPABASE_PASSWORD",
+        port=5432
+    )
+    return conn
 
- # ================= INIT DB =================
+# ================= INIT DB (SUPABASE POSTGRESQL VERSION) =================
 @app.route("/initdb")
 def init_db():
+
     db = get_db()
     cur = db.cursor()
 
     # USERS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         username TEXT UNIQUE,
         password TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -69,7 +75,7 @@ def init_db():
     # INCOME
     cur.execute("""
     CREATE TABLE IF NOT EXISTS income(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         amount REAL,
         source TEXT,
         date TEXT,
@@ -86,7 +92,7 @@ def init_db():
     # EXPENSES
     cur.execute("""
     CREATE TABLE IF NOT EXISTS expenses(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         amount REAL,
         category TEXT,
         date TEXT,
@@ -103,7 +109,7 @@ def init_db():
     # ACTIVITIES
     cur.execute("""
     CREATE TABLE IF NOT EXISTS activities(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         activity_name TEXT,
         description TEXT,
         status TEXT,
@@ -117,59 +123,114 @@ def init_db():
 
     db.commit()
     cur.close()
+    db.close()
 
-    return "SQLite Database Ready ✅"
+    return "Supabase Database Ready ✅"
+
 
 # ================= HOME =================
 @app.route("/")
 def home():
     return """
+    <!DOCTYPE html>
     <html>
     <head>
+
+    <title>HIRWA SMART PRO</title>
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <style>
+
+    *{
+        margin:0;
+        padding:0;
+        box-sizing:border-box;
+        font-family:Arial,sans-serif;
+    }
+
     body{
-        font-family:Arial;
+        min-height:100vh;
+        display:flex;
+        justify-content:center;
+        align-items:center;
         background:linear-gradient(120deg,#4e54c8,#8f94fb);
-        color:white;
-        text-align:center;
-        padding-top:80px
+        padding:20px;
     }
 
     .card{
         background:white;
         color:black;
-        width:320px;
-        margin:auto;
-        padding:25px;
-        border-radius:15px;
-        box-shadow:0 10px 25px rgba(0,0,0,0.3)
+        width:100%;
+        max-width:400px;
+        padding:35px;
+        border-radius:20px;
+        text-align:center;
+        box-shadow:0 15px 35px rgba(0,0,0,0.25);
+    }
+
+    h1{
+        color:#4e54c8;
+        margin-bottom:10px;
+    }
+
+    .subtitle{
+        color:#666;
+        margin-bottom:25px;
+        font-size:14px;
     }
 
     a{
         display:block;
-        margin:10px;
-        padding:10px;
+        margin:12px 0;
+        padding:12px;
         background:#4e54c8;
         color:white;
         text-decoration:none;
-        border-radius:10px;
-        transition:0.2s;
+        border-radius:12px;
+        transition:0.3s;
+        font-weight:bold;
     }
 
     a:hover{
         background:#2e3192;
-        transform: scale(1.05);
+        transform:translateY(-2px);
     }
+
+    .footer{
+        margin-top:20px;
+        color:gray;
+        font-size:12px;
+    }
+
     </style>
+
     </head>
 
     <body>
-    <div class='card'>
-    <h2>HIRWA SMART PRO</h2>
-    <a href='/login'>Login</a>
-    <a href='/register'>Register</a>
+
+    <div class="card">
+
+        <h1>HIRWA SMART PRO</h1>
+
+        <p class="subtitle">
+            Financial Management System
+        </p>
+
+        <a href="/login">
+            🔐 Login
+        </a>
+
+        <a href="/register">
+            📝 Register
+        </a>
+
+        <div class="footer">
+            Version 1.0 | Smart Finance Solution
+        </div>
+
     </div>
+
     </body>
     </html>
     """
@@ -185,10 +246,18 @@ def register():
 
         # ================= VALIDATION =================
         if not username or not password_raw:
-            return "<h3 style='color:red;text-align:center'>Username and password required ❌</h3>"
+            return """
+            <h3 style='color:red;text-align:center'>
+            Username and Password required ❌
+            </h3>
+            """
 
         if len(password_raw) < 4:
-            return "<h3 style='color:red;text-align:center'>Password too short ❌</h3>"
+            return """
+            <h3 style='color:red;text-align:center'>
+            Password must be at least 4 characters ❌
+            </h3>
+            """
 
         password = generate_password_hash(password_raw)
 
@@ -196,57 +265,191 @@ def register():
         cur = db.cursor()
 
         try:
-            # ================= CHECK DUPLICATE =================
-            cur.execute("SELECT id FROM users WHERE username = ?", (username,))
+
+            # ================= CHECK USER =================
+            cur.execute(
+                "SELECT id FROM users WHERE username = %s",
+                (username,)
+            )
+
             existing = cur.fetchone()
 
             if existing:
-                return "<h3 style='color:red;text-align:center'>Username already exists ❌</h3>"
+                cur.close()
+                db.close()
+
+                return """
+                <h3 style='color:red;text-align:center'>
+                Username already exists ❌
+                </h3>
+                """
 
             # ================= INSERT USER =================
             cur.execute(
-                "INSERT INTO users(username, password) VALUES (?, ?)",
+                """
+                INSERT INTO users (username, password)
+                VALUES (%s, %s)
+                """,
                 (username, password)
             )
 
             db.commit()
+
             cur.close()
+            db.close()
 
             return redirect("/login")
 
         except Exception as e:
-            return f"<h3 style='color:red;text-align:center'>Error: {str(e)}</h3>"
+
+            db.rollback()
+            cur.close()
+            db.close()
+
+            return f"""
+            <h3 style='color:red;text-align:center'>
+            Error: {str(e)}
+            </h3>
+            """
 
     # ================= UI =================
     return """
-    <html>
-    <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
+<!DOCTYPE html>
+<html>
+<head>
 
-    <body style='font-family:Arial;background:#f4f6fb;display:flex;justify-content:center;align-items:center;height:100vh'>
+<title>HIRWA SMART - Register</title>
 
-    <div style='background:white;padding:25px;border-radius:15px;width:300px;box-shadow:0 10px 20px rgba(0,0,0,0.2)'>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <h2 style='text-align:center'>Register</h2>
+<style>
 
-    <form method='POST'>
-        <input name='username' placeholder='Username'
-        style='width:100%;padding:10px;margin:5px 0'><br>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
 
-        <input name='password' type='password' placeholder='Password'
-        style='width:100%;padding:10px;margin:5px 0'><br>
+body{
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+background:linear-gradient(135deg,#4e54c8,#8f94fb);
+padding:20px;
+}
 
-        <button style='width:100%;padding:10px;background:#4e54c8;color:white;border:none'>
-            Register
-        </button>
-    </form>
+.card{
+background:white;
+width:100%;
+max-width:420px;
+padding:35px;
+border-radius:25px;
+box-shadow:0 15px 35px rgba(0,0,0,.2);
+}
 
-    </div>
+.logo{
+text-align:center;
+margin-bottom:25px;
+}
 
-    </body>
-    </html>
-    """
+.logo h1{
+color:#4e54c8;
+font-size:30px;
+}
+
+.logo p{
+color:gray;
+font-size:14px;
+}
+
+input{
+width:100%;
+padding:14px;
+border-radius:12px;
+border:1px solid #ddd;
+outline:none;
+font-size:15px;
+margin-bottom:15px;
+}
+
+input:focus{
+border-color:#4e54c8;
+}
+
+button{
+width:100%;
+padding:14px;
+border:none;
+border-radius:12px;
+background:#4e54c8;
+color:white;
+font-size:16px;
+cursor:pointer;
+transition:.3s;
+}
+
+button:hover{
+opacity:.9;
+}
+
+.login-link{
+margin-top:20px;
+text-align:center;
+font-size:14px;
+}
+
+.login-link a{
+color:#4e54c8;
+text-decoration:none;
+font-weight:bold;
+}
+
+.footer{
+margin-top:20px;
+text-align:center;
+font-size:12px;
+color:gray;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<div class="logo">
+<h1>HIRWA SMART</h1>
+<p>Create your account</p>
+</div>
+
+<form method="POST">
+
+<input type="text" name="username" placeholder="Username" required>
+
+<input type="password" name="password" placeholder="Password" required>
+
+<button type="submit">Register</button>
+
+</form>
+
+<div class="login-link">
+Already have an account?
+<a href="/login">Login</a>
+</div>
+
+<div class="footer">
+Secure Registration System
+</div>
+
+</div>
+
+</body>
+</html>
+"""
 
 # ================= LOGIN =================
 @app.route("/login", methods=["GET", "POST"])
@@ -259,15 +462,20 @@ def login():
 
         # ================= VALIDATION =================
         if not username or not password:
-            return "<h3 style='color:red;text-align:center'>Fill all fields ❌</h3>"
+            return """
+            <h3 style='color:red;text-align:center'>
+            Fill all fields ❌
+            </h3>
+            """
 
         db = get_db()
         cur = db.cursor()
 
         try:
-            # ================= FETCH USER (SQLite SAFE) =================
+
+            # ================= FETCH USER (POSTGRES FIX) =================
             cur.execute(
-                "SELECT * FROM users WHERE username = ?",
+                "SELECT * FROM users WHERE username = %s",
                 (username,)
             )
 
@@ -277,25 +485,46 @@ def login():
             db.close()
 
             # ================= VERIFY PASSWORD =================
-            if user and check_password_hash(user["password"], password):
+            if user and check_password_hash(
+                user["password"],
+                password
+            ):
 
-                # ================= SESSION =================
                 session["user_id"] = user["id"]
                 session["username"] = user["username"]
+                session.permanent = True
 
                 return redirect("/dashboard")
 
-            return "<h3 style='color:red;text-align:center'>Invalid username or password ❌</h3>"
+            return """
+            <h3 style='color:red;text-align:center'>
+            Invalid Username or Password ❌
+            </h3>
+            """
 
         except Exception as e:
-            return f"<h3 style='color:red;text-align:center'>Error: {str(e)}</h3>"
 
-    # ================= UI =================
+            try:
+                cur.close()
+                db.close()
+            except:
+                pass
+
+            return f"""
+            <h3 style='color:red;text-align:center'>
+            Error: {str(e)}
+            </h3>
+            """
+
+    # ================= UI (UNCHANGED PRO DESIGN) =================
     return """
 <!DOCTYPE html>
 <html>
+
 <head>
+
 <title>HIRWA SMART Login</title>
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -376,6 +605,7 @@ background:#4e54c8;
 color:white;
 font-size:16px;
 cursor:pointer;
+transition:.3s;
 }
 
 button:hover{
@@ -398,6 +628,12 @@ margin-top:20px;
 text-align:center;
 font-size:13px;
 color:gray;
+}
+
+.footer a{
+color:#4e54c8;
+text-decoration:none;
+font-weight:bold;
 }
 
 </style>
@@ -425,6 +661,7 @@ color:gray;
 <span class="password-toggle" onclick="togglePassword()">
 👁 Show
 </span>
+
 </div>
 
 <div class="forgot">
@@ -436,12 +673,17 @@ color:gray;
 </form>
 
 <div class="footer">
-Secure System v1.0
+Secure System v1.0 <br><br>
+
+Don't have an account?<br><br>
+
+<a href="/register">Create Account</a>
 </div>
 
 </div>
 
 <script>
+
 function togglePassword(){
 let pass = document.getElementById("password");
 
@@ -453,9 +695,11 @@ pass.type = "password";
 document.querySelector(".password-toggle").innerHTML = "👁 Show";
 }
 }
+
 </script>
 
 </body>
+
 </html>
 """
 
@@ -474,16 +718,17 @@ def dashboard():
     cur = db.cursor()
 
     try:
+
         # ================= INCOME =================
         cur.execute(
-            "SELECT COALESCE(SUM(amount),0) AS total FROM income WHERE user_id = ?",
+            "SELECT COALESCE(SUM(amount),0) AS total FROM income WHERE user_id = %s",
             (user_id,)
         )
         income = float(cur.fetchone()["total"])
 
         # ================= EXPENSES =================
         cur.execute(
-            "SELECT COALESCE(SUM(amount),0) AS total FROM expenses WHERE user_id = ?",
+            "SELECT COALESCE(SUM(amount),0) AS total FROM expenses WHERE user_id = %s",
             (user_id,)
         )
         expenses = float(cur.fetchone()["total"])
@@ -493,7 +738,7 @@ def dashboard():
 
         # ================= ACTIVITY COUNT =================
         cur.execute(
-            "SELECT COUNT(*) AS total FROM activities WHERE user_id = ?",
+            "SELECT COUNT(*) AS total FROM activities WHERE user_id = %s",
             (user_id,)
         )
         activities = cur.fetchone()["total"]
@@ -640,7 +885,6 @@ canvas {{
 
 <div class="wrapper">
 
-<!-- SIDEBAR -->
 <div class="sidebar">
 
 <h2>HIRWA SMART</h2>
@@ -651,13 +895,13 @@ canvas {{
 <a href="/dashboard">🏠 Dashboard</a>
 <a href="/income">💰 Income</a>
 <a href="/expenses">💸 Expenses</a>
-<a href="/activities">📋 Activities</a>
+<a href="/activity">📋 Activities</a>
 <a href="/ai_advice">🧠 AI Advice</a>
+<a href="/export_pdf">📄 PDF Report</a>
 <a href="/logout" class="logout">🚪 Logout</a>
 
 </div>
 
-<!-- MAIN -->
 <div class="main">
 
 <div class="header">
@@ -671,7 +915,6 @@ canvas {{
     {notif_text}
 </div>
 
-<!-- CARDS -->
 <div class="cards">
 
 <div class="card income">
@@ -696,7 +939,6 @@ canvas {{
 
 </div>
 
-<!-- CHART -->
 <div class="chart-box">
 <h3>📈 Financial Overview</h3>
 <br>
@@ -731,7 +973,6 @@ new Chart(ctx, {{
 </body>
 </html>
 """
-
 # ================= LOGOUT =================
 @app.route("/logout")
 def logout():
@@ -740,12 +981,10 @@ def logout():
     session.clear()
 
     return redirect("/login")
-
 # ================= INCOME =================
 @app.route("/income", methods=["GET", "POST"])
 def income():
 
-    # ================= AUTH =================
     if "user_id" not in session:
         return redirect("/login")
 
@@ -755,43 +994,86 @@ def income():
     try:
 
         # ================= ADD INCOME =================
-        if request.method == "POST":
+        if request.method == "POST" and "edit_id" not in request.form:
 
             amount = request.form.get("amount", "").strip()
             source = request.form.get("source", "").strip()
             date = request.form.get("date", "").strip()
 
-            # validation
             if not amount or not source or not date:
                 return "<h3 style='color:red;text-align:center'>All fields required ❌</h3>"
 
+            try:
+                amount = float(amount)
+                if amount <= 0:
+                    return "<h3 style='color:red;text-align:center'>Amount must be > 0 ❌</h3>"
+            except:
+                return "<h3 style='color:red;text-align:center'>Invalid amount ❌</h3>"
+
             cur.execute("""
                 INSERT INTO income(amount, source, date, user_id)
-                VALUES (?, ?, ?, ?)
-            """, (
-                amount,
-                source,
-                date,
-                session["user_id"]
-            ))
+                VALUES (%s, %s, %s, %s)
+            """, (amount, source, date, session["user_id"]))
 
+            db.commit()
+            return redirect("/income")
+
+        # ================= EDIT INCOME (LOAD) =================
+        edit_data = None
+        edit_id = request.args.get("edit")
+
+        if edit_id:
+            cur.execute("""
+                SELECT * FROM income
+                WHERE id = %s AND user_id = %s AND deleted_at IS NULL
+            """, (edit_id, session["user_id"]))
+            edit_data = cur.fetchone()
+
+        # ================= UPDATE INCOME =================
+        if request.method == "POST" and "edit_id" in request.form:
+
+            edit_id = request.form.get("edit_id")
+            amount = request.form.get("amount", "").strip()
+            source = request.form.get("source", "").strip()
+            date = request.form.get("date", "").strip()
+
+            cur.execute("""
+                UPDATE income
+                SET amount=%s,
+                    source=%s,
+                    date=%s,
+                    updated_at=CURRENT_TIMESTAMP
+                WHERE id=%s AND user_id=%s
+            """, (amount, source, date, edit_id, session["user_id"]))
+
+            db.commit()
+            return redirect("/income")
+
+        # ================= SOFT DELETE =================
+        delete_id = request.args.get("delete")
+        if delete_id:
+            cur.execute("""
+                UPDATE income
+                SET deleted_at = CURRENT_TIMESTAMP
+                WHERE id=%s AND user_id=%s
+            """, (delete_id, session["user_id"]))
             db.commit()
             return redirect("/income")
 
         # ================= FETCH INCOME =================
         cur.execute("""
             SELECT * FROM income
-            WHERE user_id = ?
+            WHERE user_id=%s AND deleted_at IS NULL
             ORDER BY date DESC
         """, (session["user_id"],))
 
         rows = cur.fetchall()
 
-        # ================= TOTAL INCOME =================
+        # ================= TOTAL =================
         cur.execute("""
             SELECT COALESCE(SUM(amount),0) AS total
             FROM income
-            WHERE user_id = ?
+            WHERE user_id=%s AND deleted_at IS NULL
         """, (session["user_id"],))
 
         total_income = cur.fetchone()["total"]
@@ -799,7 +1081,7 @@ def income():
     except Exception as e:
         cur.close()
         db.close()
-        return f"<h3 style='color:red;text-align:center'>Error ❌: {str(e)}</h3>"
+        return f"<h3 style='color:red;text-align:center'>Error ❌ {str(e)}</h3>"
 
     cur.close()
     db.close()
@@ -811,14 +1093,13 @@ def income():
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
-
-    body{{
+    body {{
         font-family:Arial;
         background:#f4f6fb;
         padding:20px;
     }}
 
-    .box{{
+    .box {{
         background:white;
         padding:20px;
         border-radius:15px;
@@ -827,7 +1108,7 @@ def income():
         box-shadow:0 5px 15px rgba(0,0,0,0.1);
     }}
 
-    input{{
+    input {{
         width:100%;
         padding:10px;
         margin:5px 0;
@@ -835,7 +1116,7 @@ def income():
         border:1px solid #ddd;
     }}
 
-    button{{
+    button {{
         width:100%;
         padding:10px;
         background:#28a745;
@@ -845,14 +1126,14 @@ def income():
         cursor:pointer;
     }}
 
-    .item{{
+    .item {{
         padding:10px;
         border-bottom:1px solid #eee;
         display:flex;
         justify-content:space-between;
     }}
 
-    .total{{
+    .total {{
         background:#007bff;
         color:white;
         padding:10px;
@@ -861,10 +1142,14 @@ def income():
         text-align:center;
     }}
 
-    .amount{{
-        font-weight:bold;
+    .actions a {{
+        margin-left:10px;
+        text-decoration:none;
+        font-size:13px;
     }}
 
+    .edit {{ color:green; }}
+    .delete {{ color:red; }}
     </style>
 
     </head>
@@ -873,36 +1158,51 @@ def income():
 
     <div class="box">
 
-    <h2>💰 Income Management</h2>
+    <h2>💰 Income PRO CRUD</h2>
 
     <div class="total">
         Total Income: {float(total_income):,.0f} RWF
     </div>
-
-    <form method="POST">
-
-        <input name="amount" placeholder="Amount">
-        <input name="source" placeholder="Source">
-        <input type="date" name="date">
-
-        <button>Add Income</button>
-
-    </form>
-
-    <hr>
     """
 
+    # ================= EDIT FORM =================
+    if edit_data:
+        html += f"""
+        <form method="POST">
+            <input type="hidden" name="edit_id" value="{edit_data['id']}">
+            <input name="amount" value="{edit_data['amount']}" placeholder="Amount">
+            <input name="source" value="{edit_data['source']}" placeholder="Source">
+            <input type="date" name="date" value="{edit_data['date']}">
+            <button>Update Income</button>
+        </form>
+        <hr>
+        """
+    else:
+        html += """
+        <form method="POST">
+            <input name="amount" placeholder="Amount">
+            <input name="source" placeholder="Source">
+            <input type="date" name="date">
+            <button>Add Income</button>
+        </form>
+        <hr>
+        """
+
+    # ================= LIST =================
     for r in rows:
         html += f"""
         <div class="item">
-            <span>💰 {r['source']} - {r['date']}</span>
-            <span class="amount">{float(r['amount']):,.0f} RWF</span>
+            <span>💰 {r['source']} - {r['date']} - <b>{float(r['amount']):,.0f}</b> RWF</span>
+
+            <span class="actions">
+                <a class="edit" href="/income?edit={r['id']}">Edit</a>
+                <a class="delete" href="/income?delete={r['id']}">Delete</a>
+            </span>
         </div>
         """
 
     html += """
     </div>
-
     </body>
     </html>
     """
@@ -913,7 +1213,6 @@ def income():
 @app.route("/expenses", methods=["GET", "POST"])
 def expenses():
 
-    # ================= AUTH =================
     if "user_id" not in session:
         return redirect("/login")
 
@@ -923,43 +1222,91 @@ def expenses():
     try:
 
         # ================= ADD EXPENSE =================
-        if request.method == "POST":
+        if request.method == "POST" and "edit_id" not in request.form:
 
             amount = request.form.get("amount", "").strip()
             category = request.form.get("category", "").strip()
             date = request.form.get("date", "").strip()
 
-            # validation
             if not amount or not category or not date:
                 return "<h3 style='color:red;text-align:center'>All fields required ❌</h3>"
 
+            try:
+                amount = float(amount)
+                if amount <= 0:
+                    return "<h3 style='color:red;text-align:center'>Amount must be > 0 ❌</h3>"
+            except:
+                return "<h3 style='color:red;text-align:center'>Invalid amount ❌</h3>"
+
             cur.execute("""
                 INSERT INTO expenses(amount, category, date, user_id)
-                VALUES (?, ?, ?, ?)
-            """, (
-                amount,
-                category,
-                date,
-                session["user_id"]
-            ))
+                VALUES (%s, %s, %s, %s)
+            """, (amount, category, date, session["user_id"]))
 
             db.commit()
             return redirect("/expenses")
 
-        # ================= FETCH EXPENSES =================
+        # ================= LOAD EDIT =================
+        edit_data = None
+        edit_id = request.args.get("edit")
+
+        if edit_id:
+            cur.execute("""
+                SELECT * FROM expenses
+                WHERE id=%s AND user_id=%s AND deleted_at IS NULL
+            """, (edit_id, session["user_id"]))
+            edit_data = cur.fetchone()
+
+        # ================= UPDATE EXPENSE =================
+        if request.method == "POST" and "edit_id" in request.form:
+
+            edit_id = request.form.get("edit_id")
+            amount = request.form.get("amount", "").strip()
+            category = request.form.get("category", "").strip()
+            date = request.form.get("date", "").strip()
+
+            try:
+                amount = float(amount)
+            except:
+                return "<h3 style='color:red;text-align:center'>Invalid amount ❌</h3>"
+
+            cur.execute("""
+                UPDATE expenses
+                SET amount=%s,
+                    category=%s,
+                    date=%s,
+                    updated_at=CURRENT_TIMESTAMP
+                WHERE id=%s AND user_id=%s
+            """, (amount, category, date, edit_id, session["user_id"]))
+
+            db.commit()
+            return redirect("/expenses")
+
+        # ================= SOFT DELETE =================
+        delete_id = request.args.get("delete")
+        if delete_id:
+            cur.execute("""
+                UPDATE expenses
+                SET deleted_at=CURRENT_TIMESTAMP
+                WHERE id=%s AND user_id=%s
+            """, (delete_id, session["user_id"]))
+            db.commit()
+            return redirect("/expenses")
+
+        # ================= FETCH =================
         cur.execute("""
             SELECT * FROM expenses
-            WHERE user_id = ?
+            WHERE user_id=%s AND deleted_at IS NULL
             ORDER BY date DESC
         """, (session["user_id"],))
 
         rows = cur.fetchall()
 
-        # ================= TOTAL EXPENSES =================
+        # ================= TOTAL =================
         cur.execute("""
             SELECT COALESCE(SUM(amount),0) AS total
             FROM expenses
-            WHERE user_id = ?
+            WHERE user_id=%s AND deleted_at IS NULL
         """, (session["user_id"],))
 
         total_expenses = cur.fetchone()["total"]
@@ -967,7 +1314,7 @@ def expenses():
     except Exception as e:
         cur.close()
         db.close()
-        return f"<h3 style='color:red;text-align:center'>Error ❌: {str(e)}</h3>"
+        return f"<h3 style='color:red;text-align:center'>Error ❌ {str(e)}</h3>"
 
     cur.close()
     db.close()
@@ -979,14 +1326,13 @@ def expenses():
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
-
-    body{{
+    body {{
         font-family:Arial;
         background:#f4f6fb;
         padding:20px;
     }}
 
-    .box{{
+    .box {{
         background:white;
         padding:20px;
         border-radius:15px;
@@ -995,7 +1341,7 @@ def expenses():
         box-shadow:0 5px 15px rgba(0,0,0,0.1);
     }}
 
-    input{{
+    input {{
         width:100%;
         padding:10px;
         margin:5px 0;
@@ -1003,7 +1349,7 @@ def expenses():
         border:1px solid #ddd;
     }}
 
-    button{{
+    button {{
         width:100%;
         padding:10px;
         background:#dc3545;
@@ -1013,14 +1359,15 @@ def expenses():
         cursor:pointer;
     }}
 
-    .item{{
+    .item {{
         padding:10px;
         border-bottom:1px solid #eee;
         display:flex;
         justify-content:space-between;
+        align-items:center;
     }}
 
-    .total{{
+    .total {{
         background:#dc3545;
         color:white;
         padding:10px;
@@ -1029,59 +1376,76 @@ def expenses():
         text-align:center;
     }}
 
-    .amount{{
-        font-weight:bold;
+    .actions a {{
+        margin-left:10px;
+        font-size:13px;
+        text-decoration:none;
     }}
 
+    .edit {{ color:green; }}
+    .delete {{ color:red; }}
     </style>
-
     </head>
 
     <body>
 
     <div class="box">
 
-    <h2>💸 Expenses Management</h2>
+    <h2>💸 Expenses PRO CRUD</h2>
 
     <div class="total">
         Total Expenses: {float(total_expenses):,.0f} RWF
     </div>
-
-    <form method="POST">
-
-        <input name="amount" placeholder="Amount">
-        <input name="category" placeholder="Category">
-        <input type="date" name="date">
-
-        <button>Add Expense</button>
-
-    </form>
-
-    <hr>
     """
 
+    # ================= EDIT FORM =================
+    if edit_data:
+        html += f"""
+        <form method="POST">
+            <input type="hidden" name="edit_id" value="{edit_data['id']}">
+            <input name="amount" value="{edit_data['amount']}" placeholder="Amount">
+            <input name="category" value="{edit_data['category']}" placeholder="Category">
+            <input type="date" name="date" value="{edit_data['date']}">
+            <button>Update Expense</button>
+        </form>
+        <hr>
+        """
+    else:
+        html += """
+        <form method="POST">
+            <input name="amount" placeholder="Amount">
+            <input name="category" placeholder="Category">
+            <input type="date" name="date">
+            <button>Add Expense</button>
+        </form>
+        <hr>
+        """
+
+    # ================= LIST =================
     for r in rows:
         html += f"""
         <div class="item">
-            <span>💸 {r['category']} - {r['date']}</span>
-            <span class="amount">{float(r['amount']):,.0f} RWF</span>
+            <span>💸 {r['category']} - {r['date']} - <b>{float(r['amount']):,.0f}</b> RWF</span>
+
+            <span>
+                <a class="edit" href="/expenses?edit={r['id']}">Edit</a>
+                <a class="delete" href="/expenses?delete={r['id']}">Delete</a>
+            </span>
         </div>
         """
 
     html += """
     </div>
-
     </body>
     </html>
     """
 
     return html
 
-# ================= ACTIVITIES =================
+# ================= ACTIVITIES PRO =================
 @app.route("/activity", methods=["GET", "POST"])
 def activity():
 
-    # ================= AUTH =================
     if "user_id" not in session:
         return redirect("/login")
 
@@ -1091,18 +1455,17 @@ def activity():
     try:
 
         # ================= ADD ACTIVITY =================
-        if request.method == "POST":
+        if request.method == "POST" and "edit_id" not in request.form:
 
             activity_name = request.form.get("activity_name", "").strip()
             date = request.form.get("date", "").strip()
 
-            # validation
             if not activity_name or not date:
                 return "<h3 style='color:red;text-align:center'>All fields required ❌</h3>"
 
             cur.execute("""
                 INSERT INTO activities(activity_name, date, user_id)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
             """, (
                 activity_name,
                 date,
@@ -1112,20 +1475,63 @@ def activity():
             db.commit()
             return redirect("/activity")
 
-        # ================= FETCH ACTIVITIES =================
+        # ================= LOAD EDIT =================
+        edit_data = None
+        edit_id = request.args.get("edit")
+
+        if edit_id:
+            cur.execute("""
+                SELECT * FROM activities
+                WHERE id=%s AND user_id=%s AND deleted_at IS NULL
+            """, (edit_id, session["user_id"]))
+            edit_data = cur.fetchone()
+
+        # ================= UPDATE =================
+        if request.method == "POST" and "edit_id" in request.form:
+
+            edit_id = request.form.get("edit_id")
+            activity_name = request.form.get("activity_name", "").strip()
+            date = request.form.get("date", "").strip()
+
+            if not activity_name or not date:
+                return "<h3 style='color:red;text-align:center'>All fields required ❌</h3>"
+
+            cur.execute("""
+                UPDATE activities
+                SET activity_name=%s,
+                    date=%s,
+                    updated_at=CURRENT_TIMESTAMP
+                WHERE id=%s AND user_id=%s
+            """, (activity_name, date, edit_id, session["user_id"]))
+
+            db.commit()
+            return redirect("/activity")
+
+        # ================= SOFT DELETE =================
+        delete_id = request.args.get("delete")
+        if delete_id:
+            cur.execute("""
+                UPDATE activities
+                SET deleted_at=CURRENT_TIMESTAMP
+                WHERE id=%s AND user_id=%s
+            """, (delete_id, session["user_id"]))
+            db.commit()
+            return redirect("/activity")
+
+        # ================= FETCH =================
         cur.execute("""
             SELECT * FROM activities
-            WHERE user_id = ?
+            WHERE user_id=%s AND deleted_at IS NULL
             ORDER BY date DESC
         """, (session["user_id"],))
 
         rows = cur.fetchall()
 
-        # ================= TOTAL COUNT =================
+        # ================= COUNT =================
         cur.execute("""
             SELECT COUNT(*) AS total
             FROM activities
-            WHERE user_id = ?
+            WHERE user_id=%s AND deleted_at IS NULL
         """, (session["user_id"],))
 
         total_activities = cur.fetchone()["total"]
@@ -1133,7 +1539,7 @@ def activity():
     except Exception as e:
         cur.close()
         db.close()
-        return f"<h3 style='color:red;text-align:center'>Error ❌: {str(e)}</h3>"
+        return f"<h3 style='color:red;text-align:center'>Error ❌ {str(e)}</h3>"
 
     cur.close()
     db.close()
@@ -1145,14 +1551,13 @@ def activity():
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
-
-    body{{
+    body {{
         font-family:Arial;
         background:#f4f6fb;
         padding:20px;
     }}
 
-    .box{{
+    .box {{
         background:white;
         padding:20px;
         border-radius:15px;
@@ -1161,7 +1566,7 @@ def activity():
         box-shadow:0 5px 15px rgba(0,0,0,0.1);
     }}
 
-    input{{
+    input {{
         width:100%;
         padding:10px;
         margin:5px 0;
@@ -1169,7 +1574,7 @@ def activity():
         border:1px solid #ddd;
     }}
 
-    button{{
+    button {{
         width:100%;
         padding:10px;
         background:#ff9800;
@@ -1179,14 +1584,15 @@ def activity():
         cursor:pointer;
     }}
 
-    .item{{
+    .item {{
         padding:10px;
         border-bottom:1px solid #eee;
         display:flex;
         justify-content:space-between;
+        align-items:center;
     }}
 
-    .total{{
+    .total {{
         background:#ff9800;
         color:white;
         padding:10px;
@@ -1195,58 +1601,73 @@ def activity():
         text-align:center;
     }}
 
-    .date{{
-        font-weight:bold;
+    .actions a {{
+        margin-left:10px;
+        text-decoration:none;
+        font-size:13px;
     }}
 
+    .edit {{ color:green; }}
+    .delete {{ color:red; }}
     </style>
-
     </head>
 
     <body>
 
     <div class="box">
 
-    <h2>📋 Activities Management</h2>
+    <h2>📋 Activities PRO CRUD</h2>
 
     <div class="total">
         Total Activities: {total_activities}
     </div>
-
-    <form method="POST">
-
-        <input name="activity_name" placeholder="Activity Name">
-        <input type="date" name="date">
-
-        <button>Add Activity</button>
-
-    </form>
-
-    <hr>
     """
 
+    # ================= EDIT FORM =================
+    if edit_data:
+        html += f"""
+        <form method="POST">
+            <input type="hidden" name="edit_id" value="{edit_data['id']}">
+            <input name="activity_name" value="{edit_data['activity_name']}" placeholder="Activity Name">
+            <input type="date" name="date" value="{edit_data['date']}">
+            <button>Update Activity</button>
+        </form>
+        <hr>
+        """
+    else:
+        html += """
+        <form method="POST">
+            <input name="activity_name" placeholder="Activity Name">
+            <input type="date" name="date">
+            <button>Add Activity</button>
+        </form>
+        <hr>
+        """
+
+    # ================= LIST =================
     for r in rows:
         html += f"""
         <div class="item">
-            <span>📌 {r['activity_name']}</span>
-            <span class="date">{r['date']}</span>
+            <span>📌 {r['activity_name']} - {r['date']}</span>
+            <span>
+                <a class="edit" href="/activity?edit={r['id']}">Edit</a>
+                <a class="delete" href="/activity?delete={r['id']}">Delete</a>
+            </span>
         </div>
         """
 
     html += """
     </div>
-
     </body>
     </html>
     """
 
     return html
 
-# ================= AI ADVICE =================
+# ================= AI ADVICE (PRO) =================
 @app.route("/ai_advice")
 def ai_advice():
 
-    # ================= AUTH =================
     if "user_id" not in session:
         return redirect("/login")
 
@@ -1255,47 +1676,59 @@ def ai_advice():
 
     try:
 
-        # ================= GET INCOME =================
+        # ================= INCOME =================
         cur.execute("""
             SELECT COALESCE(SUM(amount),0) AS total
             FROM income
-            WHERE user_id = ?
+            WHERE user_id = %s
         """, (session["user_id"],))
+
         total_income = float(cur.fetchone()["total"])
 
-        # ================= GET EXPENSES =================
+        # ================= EXPENSES =================
         cur.execute("""
             SELECT COALESCE(SUM(amount),0) AS total
             FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = %s
         """, (session["user_id"],))
+
         total_expenses = float(cur.fetchone()["total"])
 
         balance = total_income - total_expenses
 
-        # ================= RAW DATA FOR AI =================
+        # ================= RAW DATA =================
         cur.execute("""
-            SELECT amount FROM income WHERE user_id = ?
+            SELECT amount FROM income
+            WHERE user_id = %s
         """, (session["user_id"],))
         income = cur.fetchall()
 
         cur.execute("""
-            SELECT amount FROM expenses WHERE user_id = ?
+            SELECT amount FROM expenses
+            WHERE user_id = %s
         """, (session["user_id"],))
         expenses = cur.fetchall()
 
     except Exception as e:
         cur.close()
         db.close()
-        return f"<h3 style='color:red;text-align:center'>Error ❌: {str(e)}</h3>"
+        return f"<h3 style='color:red;text-align:center'>Error ❌ {str(e)}</h3>"
 
     cur.close()
     db.close()
 
-    # ================= AI ENGINE =================
-    summary, advice = analyze_finance(income, expenses)
+    # ================= AI ENGINE SAFE CALL =================
+    summary = "No AI summary available"
+    advice = "No AI advice available"
 
-    # ================= UI STATUS =================
+    if analyze_finance:
+        try:
+            summary, advice = analyze_finance(income, expenses)
+        except:
+            summary = "AI engine error"
+            advice = "Check your financial data consistency"
+
+    # ================= STATUS =================
     if balance < 0:
         status_color = "#dc3545"
         status_text = "⚠ Financial Risk"
@@ -1351,10 +1784,6 @@ body {{
     background:#eee;
     padding:15px;
     border-radius:10px;
-    text-align:center;
-}}
-
-h2 {{
     text-align:center;
 }}
 
@@ -1429,12 +1858,12 @@ a {{
 </html>
 """
 
-# ================= RUN =================
 if __name__ == "__main__":
 
-    # Development mode (change to False in production)
+    import os
+
     app.run(
-        debug=True,
+        debug=os.environ.get("FLASK_DEBUG", "False") == "True",
         host="0.0.0.0",
-        port=5000
+        port=int(os.environ.get("PORT", 5000))
     )
