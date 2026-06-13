@@ -725,7 +725,8 @@ def dashboard():
     if 'user_id' not in session:
         return redirect('/login')
 
-    user_id = session['user_id']
+    # 🔥 FIX: prevent PostgreSQL type mismatch (text vs integer)
+    user_id = str(session['user_id'])
     username = session.get('username', 'User')
 
     db = get_db()
@@ -790,7 +791,6 @@ def dashboard():
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-
 * {{
     margin:0;
     padding:0;
@@ -826,7 +826,6 @@ body {{
     color:white;
     text-decoration:none;
     border-radius:10px;
-    transition:0.3s;
 }}
 
 .sidebar a:hover {{
@@ -876,7 +875,6 @@ body {{
     background:white;
     padding:20px;
     border-radius:20px;
-    box-shadow:0 5px 15px rgba(0,0,0,0.08);
 }}
 
 canvas {{
@@ -890,7 +888,6 @@ canvas {{
     border-radius:10px;
     margin-top:15px;
 }}
-
 </style>
 
 </head>
@@ -900,12 +897,10 @@ canvas {{
 <div class="wrapper">
 
 <div class="sidebar">
-
 <h2>HIRWA SMART</h2>
 <p>👤 {username}</p>
 
 <br>
-
 <a href="/dashboard">🏠 Dashboard</a>
 <a href="/income">💰 Income</a>
 <a href="/expenses">💸 Expenses</a>
@@ -913,7 +908,6 @@ canvas {{
 <a href="/ai_advice">🧠 AI Advice</a>
 <a href="/export_pdf">📄 PDF Report</a>
 <a href="/logout" class="logout">🚪 Logout</a>
-
 </div>
 
 <div class="main">
@@ -964,7 +958,6 @@ canvas {{
 </div>
 
 <script>
-
 const ctx = document.getElementById("financeChart");
 
 new Chart(ctx, {{
@@ -981,7 +974,6 @@ new Chart(ctx, {{
         maintainAspectRatio: false
     }}
 }});
-
 </script>
 
 </body>
