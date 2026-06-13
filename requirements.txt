@@ -1,9 +1,5 @@
-cryptography
 flask
-gunicorn
 werkzeug
-pymysql
 reportlab
-pyjwt
-python-docx
-openpyxl
+psycopg2-binary
+gunicorn
