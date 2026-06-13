@@ -9,11 +9,11 @@ from flask import Flask, request, redirect, session, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from reportlab.platypus import (
-    SimpleDocTemplate,
-    Table,
-    TableStyle,
-    Paragraph,
-    Spacer
+SimpleDocTemplate,
+Table,
+TableStyle,
+Paragraph,
+Spacer
 )
 
 from reportlab.lib.pagesizes import A4
@@ -21,39 +21,41 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 
 # Optional AI engine import (safe fallback)
-try:
-    from ai_engine import analyze_finance
-except ImportError:
-    analyze_finance = None
 
+try:
+from ai_engine import analyze_finance
+except ImportError:
+analyze_finance = None
 
 # ================= APP =================
-app = Flask(__name__)
+
+app = Flask(**name**)
 
 # ================= SECURITY =================
+
 app.secret_key = os.environ.get(
-    "SECRET_KEY",
-    "hirwa_secret_key_change_this"
+"SECRET_KEY",
+"hirwa_secret_key_change_this"
 )
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = False
+
+# Production Ready
+
+app.config["SESSION_COOKIE_SECURE"] = True
 
 app.permanent_session_lifetime = datetime.timedelta(minutes=30)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
-
 # ================= SUPABASE DATABASE =================
+
 def get_db():
-    conn = psycopg2.connect(
-        host="YOUR_SUPABASE_HOST",
-        database="postgres",
-        user="postgres",
-        password="YOUR_SUPABASE_PASSWORD",
-        port=5432
-    )
-    return conn
+conn = psycopg2.connect(
+os.environ["DATABASE_URL"],
+sslmode="require"
+)
+return conn
 
 # ================= INIT DB (SUPABASE POSTGRESQL VERSION) =================
 @app.route("/initdb")
